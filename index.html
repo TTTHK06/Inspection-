@@ -160,6 +160,7 @@
   <div class="topbar">
     <select id="inspSel" onchange="switchInspection(this.value)"></select>
     <button class="tb-btn" onclick="newInspection()" id="t_new">New</button>
+    <button class="tb-btn" onclick="carryForward()" id="t_reinspect">Re-inspect</button>
     <button class="tb-btn" onclick="duplicateInspection()" id="t_dup">Duplicate</button>
     <button class="tb-btn" onclick="deleteInspection()" id="t_delinsp">Delete</button>
   </div>
@@ -239,6 +240,7 @@ const I18N={
     dictate:'Dictate',stop:'Stop',photos:'Photos',camera:'Camera',gallery:'Gallery',
     markup:'Mark up',capgps:'Capture GPS',update:'Update',logged:'Logged',
     recmemo:'Record memo',stopmemo:'Stop',autosave:'Auto-saving to this browser. Backup regularly.',
+    dupitem:'Duplicate item',reinspect:'Re-inspect',
     pdf_title:'INSPECTION SNAG LIST',pdf_sub:'Works completed — site inspection record',
     pdf_summary:'Outstanding Items Summary',pdf_detail:'Inspection Detail',pdf_signoff:'Sign-off',
     pdf_loc:'Location:',pdf_logged:'Logged:',pdf_notes:'Notes:'},
@@ -253,6 +255,7 @@ const I18N={
     dictate:'Dikteer',stop:'Stop',photos:'Foto\u2019s',camera:'Kamera',gallery:'Galery',
     markup:'Merk',capgps:'Kry GPS',update:'Werk by',logged:'Gelog',
     recmemo:'Neem memo op',stopmemo:'Stop',autosave:'Outomaties gestoor in hierdie blaaier. Rugsteun gereeld.',
+    dupitem:'Dupliseer item',reinspect:'Herinspeksie',
     pdf_title:'INSPEKSIE FOUTLYS',pdf_sub:'Werk voltooi — terrein-inspeksierekord',
     pdf_summary:'Uitstaande Items Opsomming',pdf_detail:'Inspeksiebesonderhede',pdf_signoff:'Goedkeuring',
     pdf_loc:'Ligging:',pdf_logged:'Gelog:',pdf_notes:'Notas:'}
@@ -269,6 +272,7 @@ function applyLang(){
   set('t_insp','insp');set('t_date','date');set('t_weather','weather');set('t_additem','additem');
   set('t_backup','backup');set('t_restore','restore');set('t_csv','csv');set('t_pdf','pdf');
   set('t_new','new');set('t_dup','dup');set('t_delinsp','delinsp');
+  const ri=document.getElementById('t_reinspect'); if(ri) ri.textContent=T('reinspect');
   const h=document.getElementById('hint'); if(!h.dataset.flashing) h.textContent=T('autosave');
 }
 function toggleLang(){ lang = lang==='en'?'af':'en'; localStorage.setItem('snag_lang',lang); applyLang(); render(); }
@@ -343,6 +347,32 @@ function addItem(data){
   touch(); render();
 }
 function delItem(id){ if(!confirm(lang==='af'?'Skrap hierdie item?':'Delete this item?')) return; items=items.filter(i=>i.id!==id); touch(); render(); }
+function dupItem(id){ const src=items.find(i=>i.id===id); if(!src) return;
+  seq++; const copy=JSON.parse(JSON.stringify(src));
+  copy.id=Date.now()+Math.random(); copy.snag=seq; copy.status=''; copy.history=[]; copy.ts=nowStamp(); copy.photos=[]; copy.audio=null;
+  // keep loc/trade/priority/notes as a starting point; clear evidence so it's a fresh observation
+  const idx=items.findIndex(i=>i.id===id); items.splice(idx+1,0,copy); touch(); render();
+  flash(lang==='af'?'Item gedupliseer.':'Item duplicated.');
+}
+function carryForward(){
+  saveCurrentToStore();
+  const src=store.inspections[store.current]; const m=src.meta||{};
+  const open=(src.items||[]).filter(i=>i.status!=='complete');
+  if(!open.length){ flash(lang==='af'?'Geen uitstaande items om oor te dra nie.':'No outstanding items to carry forward.'); return; }
+  if(!confirm(lang==='af'?`Skep nuwe herinspeksie met ${open.length} uitstaande item(s)?`:`Create a new re-inspection with ${open.length} outstanding item(s)?`)) return;
+  // build new snapshot: same project/firm meta, fresh date, only open items renumbered from 1, history seeded
+  const today=new Date().toISOString().slice(0,10);
+  let ns=1;
+  const carried=open.map(it=>{ const c=JSON.parse(JSON.stringify(it));
+    c.id=Date.now()+Math.random()+ns; c.snag=ns++;
+    c.history=(c.history||[]).concat([{ts:nowStamp(),from:c.status||'(none)',to:'re-inspect'}]);
+    return c; });
+  const snap={ meta:Object.assign({},m,{date:today, name:(m.name||'')+(lang==='af'?' (herinspeksie)':' (re-inspection)')}),
+    items:carried, seq:carried.length, logo:src.logo||null, v:3 };
+  const id=uid(); store.inspections[id]=snap; store.order.push(id); store.current=id;
+  loadCurrentFromStore(); render(); renderInspSelector(); persistStore();
+  flash(lang==='af'?'Herinspeksie geskep met uitstaande items.':'Re-inspection created with outstanding items.');
+}
 function setStatus(id,val){ const it=items.find(i=>i.id===id); if(!it) return; const old=it.status;
   it.status=(it.status===val)?'':val; if(it.status&&it.status!==old){ it.history.push({ts:nowStamp(),from:old||'(none)',to:it.status}); } touch(); render(); }
 function bind(id,key,el){ const it=items.find(i=>i.id===id); if(it) it[key]=el.value; if(key==='loc') updateLocLabel(id,el.value); touch(); }
@@ -474,6 +504,7 @@ function itemCard(it){
     <div class="item-head">
       <span class="item-no">SNAG ${String(it.snag).padStart(3,'0')}</span>
       <span class="loc" id="loclbl_${it.id}">${it.loc||'(no location set)'}</span>
+      <button class="del" style="border-color:var(--line);color:var(--muted)" onclick="dupItem(${js(it.id)})" title="${T('dupitem')}">⧉</button>
       <button class="del" onclick="delItem(${js(it.id)})">✕</button>
     </div>
     <div class="item-body">
@@ -556,6 +587,14 @@ function exportCSV(){ saveCurrentToStore(); const m=meta();
 /* ================= PDF ================= */
 async function exportPDF(){
   saveCurrentToStore();
+  // Large-PDF guard: warn if photo count is high enough to make emailing awkward.
+  const photoCount=items.reduce((n,it)=>n+(it.photos?it.photos.length:0),0);
+  if(photoCount>=30){
+    const msg=lang==='af'
+      ? `Hierdie inspeksie het ${photoCount} foto's. Die PDF kan groot wees om te e-pos. Gaan voort?`
+      : `This inspection has ${photoCount} photos. The PDF may be large to email. Continue?`;
+    if(!confirm(msg)) return;
+  }
   const { jsPDF }=window.jspdf; const doc=new jsPDF({unit:'mm',format:'a4'});
   const W=210,H=297,M=15; let y=M; const m=meta();
   const line=(yy,light)=>{doc.setDrawColor(light?210:170);doc.setLineWidth(0.2);doc.line(M,yy,W-M,yy);};
