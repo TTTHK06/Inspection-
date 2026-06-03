@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Inspection Snag List</title>
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Snag List">
+<meta name="theme-color" content="#0f1115">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Crect width='180' height='180' fill='%230f1115'/%3E%3Crect x='30' y='30' width='120' height='120' rx='16' fill='none' stroke='%23ff7a18' stroke-width='10'/%3E%3Cpath d='M60 92l22 22 40-50' fill='none' stroke='%23facc15' stroke-width='12' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1d212b; --line:#2a2f3a;
+    --ink:#e8eaed; --muted:#9aa3b2; --accent:#ff7a18; --accent2:#facc15;
+    --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; --na:#64748b;
+    --radius:10px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0;}
+  body{
+    font-family:"DM Mono","SF Mono",ui-monospace,Menlo,Consolas,monospace;
+    background:radial-gradient(900px 500px at 100% -10%, rgba(255,122,24,.08), transparent 60%), var(--bg);
+    color:var(--ink); line-height:1.45; padding-bottom:120px;
+  }
+  .wrap{max-width:760px; margin:0 auto; padding:16px;}
+  header.app{
+    display:flex; align-items:center; gap:12px; padding:14px 16px;
+    border:1px solid var(--line); border-radius:var(--radius);
+    background:linear-gradient(180deg,var(--panel2),var(--panel));
+    position:sticky; top:8px; z-index:30; margin-bottom:16px; box-shadow:0 8px 30px rgba(0,0,0,.4);
+  }
+  .badge{width:42px;height:42px;flex:none;border-radius:8px;
+    background:repeating-linear-gradient(45deg,var(--accent),var(--accent) 6px,#1a1d24 6px,#1a1d24 12px);
+    border:1px solid #000; box-shadow:inset 0 0 0 2px rgba(255,255,255,.06);}
+  header.app h1{font-size:15px; margin:0; letter-spacing:.5px; text-transform:uppercase;}
+  header.app p{margin:2px 0 0; font-size:11px; color:var(--muted); letter-spacing:.3px;}
+  .lang{margin-left:auto; border:1px solid var(--line); background:var(--bg); color:var(--accent2);
+    border-radius:7px; padding:7px 12px; font:inherit; font-size:11px; cursor:pointer; text-transform:uppercase; letter-spacing:.5px;}
+
+  .topbar{display:flex; gap:8px; align-items:center; margin-bottom:16px; flex-wrap:wrap;}
+  .topbar select{flex:1; min-width:160px;}
+  .tb-btn{border:1px solid var(--line); background:var(--panel2); color:var(--ink);
+    border-radius:8px; padding:11px 12px; font:inherit; font-size:12px; cursor:pointer; white-space:nowrap;}
+  .tb-btn:active{transform:translateY(1px);}
+
+  .panel{border:1px solid var(--line); border-radius:var(--radius); background:var(--panel); padding:16px; margin-bottom:16px;}
+  .panel h2{font-size:11px; letter-spacing:1.5px; text-transform:uppercase; color:var(--accent2);
+    margin:0 0 14px; font-weight:700; display:flex; align-items:center; gap:8px;}
+  .panel h2::before{content:""; width:10px; height:10px; background:var(--accent); display:inline-block; transform:rotate(45deg);}
+  label{display:block; font-size:10px; letter-spacing:.8px; text-transform:uppercase; color:var(--muted); margin-bottom:5px;}
+  input,textarea,select{width:100%; background:var(--bg); border:1px solid var(--line); color:var(--ink);
+    border-radius:8px; padding:11px 12px; font:inherit; font-size:14px; outline:none;}
+  input:focus,textarea:focus,select:focus{border-color:var(--accent); box-shadow:0 0 0 3px rgba(255,122,24,.15);}
+  textarea{resize:vertical; min-height:70px;}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  .grid2 .full{grid-column:1/-1;}
+  .field{margin-bottom:12px;} .field:last-child{margin-bottom:0;}
+
+  .logo-row{display:flex; gap:12px; align-items:center;}
+  .logo-prev{width:64px; height:64px; flex:none; border:1px solid var(--line); border-radius:8px; background:var(--bg);
+    display:flex; align-items:center; justify-content:center; overflow:hidden; color:var(--na); font-size:9px; text-align:center;}
+  .logo-prev img{width:100%; height:100%; object-fit:contain;}
+
+  .item{border:1px solid var(--line); border-radius:var(--radius); background:var(--panel); margin-bottom:14px; overflow:hidden;}
+  .item.closed{opacity:.62;}
+  .item-head{display:flex; align-items:center; gap:10px; padding:12px 14px; background:var(--panel2); border-bottom:1px solid var(--line);}
+  .item-no{font-weight:700; font-size:13px; color:var(--accent2); background:var(--bg); border:1px solid var(--line);
+    border-radius:6px; padding:4px 9px; white-space:nowrap;}
+  .item-head .loc{flex:1; font-size:13px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .del{background:transparent; border:1px solid var(--line); color:var(--bad); border-radius:6px; padding:6px 10px; font:inherit; font-size:12px; cursor:pointer;}
+  .del:active{background:rgba(239,68,68,.12);}
+  .item-body{padding:14px;}
+  .collapsed .item-body{display:none;}
+
+  .divider{display:flex; align-items:center; gap:12px; margin:6px 2px 14px; color:var(--ok); font-size:11px; letter-spacing:1px; text-transform:uppercase;}
+  .divider::before,.divider::after{content:""; flex:1; height:1px; background:var(--line);}
+
+  .status-row{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:4px;}
+  .chip{flex:1; min-width:110px; text-align:center; cursor:pointer; user-select:none; border:1px solid var(--line);
+    border-radius:8px; padding:9px 6px; font-size:12px; letter-spacing:.5px; text-transform:uppercase; color:var(--muted); background:var(--bg); transition:.12s;}
+  .chip[data-on="1"][data-v="complete"]{background:rgba(34,197,94,.15); border-color:var(--ok); color:#86efac;}
+  .chip[data-on="1"][data-v="incomplete"]{background:rgba(245,158,11,.15); border-color:var(--warn); color:#fcd34d;}
+  .chip[data-on="1"][data-v="defect"]{background:rgba(239,68,68,.15); border-color:var(--bad); color:#fca5a5;}
+
+  .photos{display:grid; grid-template-columns:repeat(auto-fill,minmax(90px,1fr)); gap:8px; margin-top:10px;}
+  .thumb{position:relative; aspect-ratio:1; border-radius:8px; overflow:hidden; border:1px solid var(--line);}
+  .thumb img{width:100%; height:100%; object-fit:cover; display:block; cursor:pointer;}
+  .thumb .x{position:absolute; top:3px; right:3px; width:22px; height:22px; border-radius:50%; border:none; background:rgba(0,0,0,.7); color:#fff; font-size:14px; line-height:1; cursor:pointer;}
+  .thumb .edit{position:absolute; bottom:3px; left:3px; right:3px; border:none; cursor:pointer; background:rgba(0,0,0,.6); color:#fff; font-size:9px; padding:3px; border-radius:4px; text-transform:uppercase; letter-spacing:.5px;}
+  .photo-btns{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;}
+  .pbtn{flex:1; min-width:90px; border:1px dashed var(--line); background:var(--bg); color:var(--muted); border-radius:8px; padding:11px; font:inherit; font-size:12px; cursor:pointer; text-transform:uppercase; letter-spacing:.5px;}
+  .pbtn:active{border-color:var(--accent); color:var(--ink);}
+  .ts{font-size:10px; color:var(--na); margin-top:8px; letter-spacing:.5px;}
+
+  .notes-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:5px;}
+  .notes-head label{margin:0;}
+  .mic{border:1px solid var(--line); background:var(--bg); color:var(--muted); border-radius:7px; padding:5px 11px; font:inherit; font-size:11px; cursor:pointer; text-transform:uppercase; letter-spacing:.5px; display:inline-flex; align-items:center; gap:6px;}
+  .mic:active{border-color:var(--accent);}
+  .mic[data-rec="1"]{border-color:var(--bad); color:#fca5a5; background:rgba(239,68,68,.12); animation:pulse 1.1s ease-in-out infinite;}
+  .mic .dot{width:8px; height:8px; border-radius:50%; background:currentColor;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+
+  .audio-row{margin-top:10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;}
+  .audio-row audio{height:34px; max-width:100%;}
+  .recbtn{border:1px solid var(--line); background:var(--bg); color:var(--muted); border-radius:7px; padding:8px 12px; font:inherit; font-size:11px; cursor:pointer; text-transform:uppercase; letter-spacing:.5px; display:inline-flex; align-items:center; gap:6px;}
+  .recbtn[data-rec="1"]{border-color:var(--bad); color:#fca5a5; background:rgba(239,68,68,.12); animation:pulse 1.1s ease-in-out infinite;}
+
+  .gps{font-size:10px; color:var(--na); letter-spacing:.4px; margin-top:6px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .gps button{border:1px solid var(--line); background:var(--bg); color:var(--muted); border-radius:6px; padding:4px 9px; font:inherit; font-size:10px; cursor:pointer; text-transform:uppercase; letter-spacing:.4px;}
+  .gps .coord{color:var(--ok);}
+
+  .hist{margin-top:8px; border-top:1px dashed var(--line); padding-top:8px;}
+  .hist .h-line{font-size:10px; color:var(--muted); letter-spacing:.3px; margin-bottom:3px;}
+  .hist .h-line b{color:var(--ink);}
+
+  .add{width:100%; border:1px solid var(--accent); background:linear-gradient(180deg,rgba(255,122,24,.18),rgba(255,122,24,.06));
+    color:var(--accent2); border-radius:var(--radius); padding:15px; font:inherit; font-size:13px; letter-spacing:1px; text-transform:uppercase; font-weight:700; cursor:pointer; margin-bottom:16px;}
+  .add:active{transform:translateY(1px);}
+
+  .filters{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;}
+  .fchip{border:1px solid var(--line); background:var(--panel); color:var(--muted); border-radius:20px; padding:6px 12px; font:inherit; font-size:11px; cursor:pointer; text-transform:uppercase; letter-spacing:.4px;}
+  .fchip[data-on="1"]{border-color:var(--accent); color:var(--accent2); background:rgba(255,122,24,.12);}
+
+  .footer-bar{position:fixed; bottom:0; left:0; right:0; z-index:40; background:linear-gradient(180deg,rgba(15,17,21,.4),var(--bg) 40%); padding:12px 16px 18px; backdrop-filter:blur(6px);}
+  .footer-inner{max-width:760px; margin:0 auto; display:flex; gap:8px; flex-wrap:wrap;}
+  .btn{flex:1; min-width:70px; border:none; border-radius:10px; padding:14px 8px; font:inherit; font-size:11px; letter-spacing:.5px; text-transform:uppercase; font-weight:700; cursor:pointer;}
+  .btn-pdf{background:var(--accent); color:#1a1209;}
+  .btn-sec{background:var(--panel2); color:var(--ink); border:1px solid var(--line);}
+  .btn:active{transform:translateY(1px);}
+  .hint{font-size:11px; color:var(--muted); text-align:center; margin-top:8px;}
+  @media(max-width:520px){ .grid2{grid-template-columns:1fr;} }
+
+  .modal{position:fixed; inset:0; z-index:60; background:rgba(0,0,0,.85); display:none; flex-direction:column; padding:12px;}
+  .modal.on{display:flex;}
+  .modal-canvas-wrap{flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden;}
+  .modal canvas{max-width:100%; max-height:100%; touch-action:none; border:1px solid var(--line); border-radius:8px;}
+  .modal-tools{display:flex; gap:8px; padding:12px 0; flex-wrap:wrap; justify-content:center;}
+  .modal-tools button{border:1px solid var(--line); background:var(--panel); color:var(--ink); border-radius:8px; padding:11px 14px; font:inherit; font-size:12px; cursor:pointer; text-transform:uppercase; letter-spacing:.5px;}
+  .modal-tools button.prim{background:var(--accent); color:#1a1209; border-color:var(--accent);}
+  .modal-tools button.on{border-color:var(--accent2); color:var(--accent2);}
+  .modal-tools .swatch{width:30px; height:30px; padding:0; border-radius:50%;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="app">
+    <div class="badge"></div>
+    <div>
+      <h1 id="t_title">Inspection Snag List</h1>
+      <p id="t_sub">Field capture &middot; on-site record &middot; PDF export</p>
+    </div>
+    <button class="lang" id="langBtn" onclick="toggleLang()">AFR</button>
+  </header>
+
+  <!-- INSPECTION SWITCHER -->
+  <div class="topbar">
+    <select id="inspSel" onchange="switchInspection(this.value)"></select>
+    <button class="tb-btn" onclick="newInspection()" id="t_new">New</button>
+    <button class="tb-btn" onclick="duplicateInspection()" id="t_dup">Duplicate</button>
+    <button class="tb-btn" onclick="deleteInspection()" id="t_delinsp">Delete</button>
+  </div>
+
+  <section class="panel">
+    <h2 id="t_firm_h">Firm / Letterhead</h2>
+    <div class="field">
+      <label id="t_logo">Logo (optional)</label>
+      <div class="logo-row">
+        <div class="logo-prev" id="logo_prev">No logo</div>
+        <div style="flex:1; display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="pbtn" style="flex:1" onclick="pickLogo()" id="t_uplogo">Upload Logo</button>
+          <button class="pbtn" style="flex:none" onclick="clearLogo()" id="t_rmlogo">Remove</button>
+        </div>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="field full"><label id="t_firmname">Firm Name</label><input id="f_firm" oninput="touch()" placeholder="De Villiers &amp; Moore Consulting Engineers"></div>
+      <div class="field full"><label id="t_firmdet">Firm Details (address / tel / email)</label><textarea id="f_details" oninput="touch()" placeholder="One line per detail"></textarea></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2 id="t_proj_h">Project Details</h2>
+    <div class="grid2">
+      <div class="field"><label id="t_pname">Project Name</label><input id="p_name" oninput="touch();syncSel()" placeholder="e.g. Substation Building B"></div>
+      <div class="field"><label id="t_pno">Project No.</label><input id="p_no" oninput="touch();syncSel()" placeholder="e.g. M5438"></div>
+      <div class="field"><label id="t_client">Client</label><input id="p_client" oninput="touch()" placeholder="Client / organisation"></div>
+      <div class="field"><label id="t_addr">Site Address</label><input id="p_addr" oninput="touch()" placeholder="Physical site address"></div>
+      <div class="field"><label id="t_insp">Inspector</label><input id="p_inspector" oninput="touch()" placeholder="Name &amp; designation"></div>
+      <div class="field"><label id="t_date">Inspection Date</label><input id="p_date" type="date" oninput="touch()"></div>
+      <div class="field full"><label id="t_weather">Weather / Site Conditions</label><input id="p_weather" oninput="touch()" placeholder="e.g. Clear, 22°C, dry"></div>
+    </div>
+  </section>
+
+  <div class="filters" id="filters"></div>
+  <div id="items"></div>
+  <button class="add" onclick="addItem()" id="t_additem">＋ Add Inspection Item</button>
+</div>
+
+<div class="footer-bar">
+  <div class="footer-inner">
+    <button class="btn btn-sec" onclick="exportJSON()" id="t_backup">Backup</button>
+    <button class="btn btn-sec" onclick="importJSON()" id="t_restore">Restore</button>
+    <button class="btn btn-sec" onclick="exportCSV()" id="t_csv">CSV</button>
+    <button class="btn btn-pdf" onclick="exportPDF()" id="t_pdf">PDF</button>
+  </div>
+  <div class="hint" id="hint">Auto-saving to this browser. Backup regularly.</div>
+</div>
+
+<div class="modal" id="annot">
+  <div class="modal-canvas-wrap"><canvas id="acanvas"></canvas></div>
+  <div class="modal-tools">
+    <button class="swatch" style="background:#ef4444" onclick="setPen('#ef4444')"></button>
+    <button class="swatch" style="background:#facc15" onclick="setPen('#facc15')"></button>
+    <button class="swatch" style="background:#22c55e" onclick="setPen('#22c55e')"></button>
+    <button id="tool_free" class="on" onclick="setTool('free')">Free</button>
+    <button id="tool_arrow" onclick="setTool('arrow')">Arrow</button>
+    <button id="tool_ellipse" onclick="setTool('ellipse')">Circle</button>
+    <button onclick="undoAnnot()">Undo</button>
+    <button onclick="closeAnnot(false)">Cancel</button>
+    <button class="prim" onclick="closeAnnot(true)">Save</button>
+  </div>
+</div>
+
+<script>
+/* ================= i18n ================= */
+const I18N={
+  en:{title:'Inspection Snag List',sub:'Field capture · on-site record · PDF export',langBtn:'AFR',
+    firm_h:'Firm / Letterhead',logo:'Logo (optional)',uplogo:'Upload Logo',rmlogo:'Remove',
+    firmname:'Firm Name',firmdet:'Firm Details (address / tel / email)',proj_h:'Project Details',
+    pname:'Project Name',pno:'Project No.',client:'Client',addr:'Site Address',insp:'Inspector',
+    date:'Inspection Date',weather:'Weather / Site Conditions',additem:'＋ Add Inspection Item',
+    backup:'Backup',restore:'Restore',csv:'CSV',pdf:'PDF',new:'New',dup:'Duplicate',delinsp:'Delete',
+    closed:'Closed Items',complete:'Complete',incomplete:'Incomplete',defect:'Defect',
+    loc:'Location / Area',trade:'Trade / Discipline',priority:'Priority',notes:'Notes',
+    dictate:'Dictate',stop:'Stop',photos:'Photos',camera:'Camera',gallery:'Gallery',
+    markup:'Mark up',capgps:'Capture GPS',update:'Update',logged:'Logged',
+    recmemo:'Record memo',stopmemo:'Stop',autosave:'Auto-saving to this browser. Backup regularly.',
+    pdf_title:'INSPECTION SNAG LIST',pdf_sub:'Works completed — site inspection record',
+    pdf_summary:'Outstanding Items Summary',pdf_detail:'Inspection Detail',pdf_signoff:'Sign-off',
+    pdf_loc:'Location:',pdf_logged:'Logged:',pdf_notes:'Notes:'},
+  af:{title:'Inspeksie Foutlys',sub:'Veldopname · terreinrekord · PDF-uitvoer',langBtn:'ENG',
+    firm_h:'Firma / Briefhoof',logo:'Logo (opsioneel)',uplogo:'Laai Logo',rmlogo:'Verwyder',
+    firmname:'Firmanaam',firmdet:'Firmabesonderhede (adres / tel / e-pos)',proj_h:'Projekbesonderhede',
+    pname:'Projeknaam',pno:'Projek Nr.',client:'Kliënt',addr:'Terreinadres',insp:'Inspekteur',
+    date:'Inspeksiedatum',weather:'Weer / Terreintoestande',additem:'＋ Voeg Inspeksie-item By',
+    backup:'Rugsteun',restore:'Herstel',csv:'CSV',pdf:'PDF',new:'Nuut',dup:'Dupliseer',delinsp:'Skrap',
+    closed:'Voltooide Items',complete:'Voltooi',incomplete:'Onvoltooi',defect:'Gebrek',
+    loc:'Ligging / Area',trade:'Vakgebied',priority:'Prioriteit',notes:'Notas',
+    dictate:'Dikteer',stop:'Stop',photos:'Foto\u2019s',camera:'Kamera',gallery:'Galery',
+    markup:'Merk',capgps:'Kry GPS',update:'Werk by',logged:'Gelog',
+    recmemo:'Neem memo op',stopmemo:'Stop',autosave:'Outomaties gestoor in hierdie blaaier. Rugsteun gereeld.',
+    pdf_title:'INSPEKSIE FOUTLYS',pdf_sub:'Werk voltooi — terrein-inspeksierekord',
+    pdf_summary:'Uitstaande Items Opsomming',pdf_detail:'Inspeksiebesonderhede',pdf_signoff:'Goedkeuring',
+    pdf_loc:'Ligging:',pdf_logged:'Gelog:',pdf_notes:'Notas:'}
+};
+let lang = localStorage.getItem('snag_lang') || 'en';
+function T(k){ return (I18N[lang]&&I18N[lang][k])||I18N.en[k]||k; }
+function applyLang(){
+  document.documentElement.lang=lang;
+  const set=(id,k)=>{const e=document.getElementById(id); if(e) e.textContent=T(k);};
+  set('t_title','title');set('t_sub','sub');set('langBtn','langBtn');
+  set('t_firm_h','firm_h');set('t_logo','logo');set('t_uplogo','uplogo');set('t_rmlogo','rmlogo');
+  set('t_firmname','firmname');set('t_firmdet','firmdet');set('t_proj_h','proj_h');
+  set('t_pname','pname');set('t_pno','pno');set('t_client','client');set('t_addr','addr');
+  set('t_insp','insp');set('t_date','date');set('t_weather','weather');set('t_additem','additem');
+  set('t_backup','backup');set('t_restore','restore');set('t_csv','csv');set('t_pdf','pdf');
+  set('t_new','new');set('t_dup','dup');set('t_delinsp','delinsp');
+  const h=document.getElementById('hint'); if(!h.dataset.flashing) h.textContent=T('autosave');
+}
+function toggleLang(){ lang = lang==='en'?'af':'en'; localStorage.setItem('snag_lang',lang); applyLang(); render(); }
+
+/* ================= multi-inspection store ================= */
+/* localStorage key 'snag_store' = { inspections: { id: snapshot }, order:[id], current:id } */
+const STORE_KEY='snag_store';
+let store={inspections:{},order:[],current:null};
+let items=[], seq=0, logoData=null;
+let activeFilters={status:new Set(),trade:new Set(),priority:new Set()};
+
+const TRADES=['HVAC','Wet Services','Fire','General/Other'];
+const PRIORITIES=['Critical','Minor'];
+
+function nowStamp(){const d=new Date(),p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;}
+function uid(){return 'i'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+
+function loadStore(){
+  try{ const raw=localStorage.getItem(STORE_KEY); if(raw){ store=JSON.parse(raw); return; } }catch(e){}
+  // migrate old single-draft if present
+  try{ const old=localStorage.getItem('snag_draft'); if(old){ const d=JSON.parse(old); const id=uid();
+    store={inspections:{[id]:d},order:[id],current:id}; persistStore(); return; } }catch(e){}
+  const id=uid(); store={inspections:{[id]:blankSnapshot()},order:[id],current:id};
+}
+function persistStore(){
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify(store)); return true; }
+  catch(e){ flash(lang==='af'?'Stoor misluk — berging vol. Rugsteun na lêer.':'Save failed — storage full. Back up to file.'); return false; }
+}
+function blankSnapshot(){ return {meta:{firm:'',details:'',name:'',no:'',client:'',addr:'',inspector:'',date:new Date().toISOString().slice(0,10),weather:''}, items:[], seq:0, logo:null, v:3}; }
+
+function curSnapshot(){ return {meta:meta(), items, seq, logo:logoData, v:3}; }
+function saveCurrentToStore(){ if(store.current){ store.inspections[store.current]=curSnapshot(); } }
+
+let autosaveTimer=null;
+function touch(){ clearTimeout(autosaveTimer); autosaveTimer=setTimeout(()=>{ saveCurrentToStore(); persistStore(); },600); }
+function touchNow(){ saveCurrentToStore(); persistStore(); }
+
+function loadCurrentFromStore(){
+  const d=store.inspections[store.current]||blankSnapshot();
+  applySnapshotToForm(d);
+}
+function applySnapshotToForm(d){
+  const m=d.meta||{};
+  setVal('f_firm',m.firm);setVal('f_details',m.details);setVal('p_name',m.name);setVal('p_no',m.no);
+  setVal('p_client',m.client);setVal('p_addr',m.addr);setVal('p_inspector',m.inspector);
+  setVal('p_date',m.date||new Date().toISOString().slice(0,10));setVal('p_weather',m.weather);
+  items=(d.items||[]).map(it=>Object.assign({trade:'',priority:'',gps:null,history:[],snag:0,audio:null},it));
+  seq=d.seq || items.reduce((mx,i)=>Math.max(mx,i.snag||0),0);
+  logoData=d.logo||null; renderLogo();
+}
+function inspLabel(d){ const m=d.meta||{}; const nm=m.name||'(untitled)'; return (m.no?m.no+' — ':'')+nm; }
+function renderInspSelector(){
+  const sel=document.getElementById('inspSel'); sel.innerHTML='';
+  store.order.forEach(id=>{ const o=document.createElement('option'); o.value=id; o.textContent=inspLabel(store.inspections[id]); if(id===store.current)o.selected=true; sel.appendChild(o); });
+}
+function syncSel(){ saveCurrentToStore(); const sel=document.getElementById('inspSel'); const o=[...sel.options].find(x=>x.value===store.current); if(o) o.textContent=inspLabel(store.inspections[store.current]); }
+
+function switchInspection(id){ saveCurrentToStore(); persistStore(); store.current=id; loadCurrentFromStore(); activeFilters={status:new Set(),trade:new Set(),priority:new Set()}; render(); persistStore(); }
+function newInspection(){ saveCurrentToStore(); const id=uid(); store.inspections[id]=blankSnapshot(); store.order.push(id); store.current=id; loadCurrentFromStore(); items=[]; addItem(); renderInspSelector(); persistStore(); flash(lang==='af'?'Nuwe inspeksie geskep.':'New inspection created.'); }
+function duplicateInspection(){ saveCurrentToStore(); const src=store.inspections[store.current]; const copy=JSON.parse(JSON.stringify(src)); copy.meta.name=(copy.meta.name||'')+' (copy)'; const id=uid(); store.inspections[id]=copy; store.order.push(id); store.current=id; loadCurrentFromStore(); render(); renderInspSelector(); persistStore(); flash(lang==='af'?'Inspeksie gedupliseer.':'Inspection duplicated.'); }
+function deleteInspection(){
+  if(store.order.length<=1){ flash(lang==='af'?'Kan nie die laaste inspeksie skrap nie.':'Cannot delete the only inspection.'); return; }
+  if(!confirm(lang==='af'?'Skrap hierdie inspeksie heeltemal?':'Delete this entire inspection?')) return;
+  delete store.inspections[store.current]; store.order=store.order.filter(x=>x!==store.current);
+  store.current=store.order[0]; loadCurrentFromStore(); render(); renderInspSelector(); persistStore();
+}
+
+/* ================= items ================= */
+function addItem(data){
+  if(data){ items.push(data); }
+  else{ seq++; items.push({id:Date.now()+Math.random(),snag:seq,loc:'',status:'',trade:'',priority:'',notes:'',photos:[],audio:null,gps:null,ts:nowStamp(),history:[]}); }
+  touch(); render();
+}
+function delItem(id){ if(!confirm(lang==='af'?'Skrap hierdie item?':'Delete this item?')) return; items=items.filter(i=>i.id!==id); touch(); render(); }
+function setStatus(id,val){ const it=items.find(i=>i.id===id); if(!it) return; const old=it.status;
+  it.status=(it.status===val)?'':val; if(it.status&&it.status!==old){ it.history.push({ts:nowStamp(),from:old||'(none)',to:it.status}); } touch(); render(); }
+function bind(id,key,el){ const it=items.find(i=>i.id===id); if(it) it[key]=el.value; if(key==='loc') updateLocLabel(id,el.value); touch(); }
+function updateLocLabel(id,val){ const lbl=document.querySelector(`#loclbl_${id}`); if(lbl) lbl.textContent=val||'(no location set)'; }
+
+/* ================= GPS ================= */
+function captureGPS(id){ if(!navigator.geolocation){ flash('Geolocation not available.'); return; }
+  flash(lang==='af'?'Kry ligging…':'Getting location…');
+  navigator.geolocation.getCurrentPosition(
+    pos=>{ const it=items.find(i=>i.id===id); if(!it) return; it.gps={lat:pos.coords.latitude,lng:pos.coords.longitude,acc:Math.round(pos.coords.accuracy)}; touch(); render(); },
+    err=>{ flash(err.code===1?(lang==='af'?'Liggingtoestemming geweier.':'Location permission denied.'):'Could not get location.'); },
+    {enableHighAccuracy:true,timeout:10000,maximumAge:0});
+}
+
+/* ================= photos ================= */
+function pickPhoto(id,capture){ const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.multiple=true; if(capture) inp.capture='environment';
+  inp.onchange=e=>{ const files=[...e.target.files]; let pending=files.length;
+    files.forEach(f=>compress(f,1280,0.72,d=>{ const it=items.find(i=>i.id===id); if(it) it.photos.push(d); if(--pending===0){ touch(); render(); } })); };
+  inp.click();
+}
+function compress(file,max,q,cb){ const r=new FileReader(); r.onload=ev=>{ const img=new Image(); img.onload=()=>{ let w=img.width,h=img.height;
+  if(w>h&&w>max){h=h*max/w;w=max;}else if(h>=w&&h>max){w=w*max/h;h=max;} const c=document.createElement('canvas'); c.width=w;c.height=h; c.getContext('2d').drawImage(img,0,0,w,h); cb(c.toDataURL('image/jpeg',q)); }; img.src=ev.target.result; }; r.readAsDataURL(file); }
+function delPhoto(id,idx){ const it=items.find(i=>i.id===id); if(!it) return; it.photos.splice(idx,1); touch(); render(); }
+
+/* ================= logo ================= */
+function pickLogo(){ const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.onchange=e=>{ const f=e.target.files[0]; if(!f) return; compress(f,400,0.85,d=>{ logoData=d; renderLogo(); touch(); }); }; inp.click(); }
+function clearLogo(){ logoData=null; renderLogo(); touch(); }
+function renderLogo(){ const p=document.getElementById('logo_prev'); p.innerHTML=logoData?`<img src="${logoData}">`:T('logo')?'':''; if(!logoData) p.textContent='No logo'; }
+
+/* ================= audio memo ================= */
+let mediaRec=null, audioChunks=[], audioRecId=null;
+async function toggleAudio(id){
+  if(audioRecId===id){ stopAudio(); return; }
+  if(mediaRec) stopAudio();
+  if(!navigator.mediaDevices||!window.MediaRecorder){ flash(lang==='af'?'Opname nie ondersteun nie.':'Recording not supported here.'); return; }
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    mediaRec=new MediaRecorder(stream); audioChunks=[];
+    mediaRec.ondataavailable=e=>{ if(e.data.size) audioChunks.push(e.data); };
+    mediaRec.onstop=()=>{ const blob=new Blob(audioChunks,{type:mediaRec.mimeType||'audio/webm'});
+      const r=new FileReader(); r.onload=()=>{ const it=items.find(i=>i.id===id); if(it) it.audio=r.result; touch(); render(); };
+      r.readAsDataURL(blob); stream.getTracks().forEach(t=>t.stop()); };
+    mediaRec.start(); audioRecId=id; setRec(id,true);
+  }catch(e){ flash(lang==='af'?'Mikrofoon geweier.':'Microphone denied.'); }
+}
+function stopAudio(){ const id=audioRecId; if(mediaRec&&mediaRec.state!=='inactive'){ try{mediaRec.stop();}catch(e){} } mediaRec=null; audioRecId=null; if(id!=null) setRec(id,false); }
+function setRec(id,on){ const b=document.getElementById('rec_'+id); if(!b) return; b.dataset.rec=on?'1':'0'; b.textContent=on?T('stopmemo'):'🎙 '+T('recmemo'); }
+function delAudio(id){ const it=items.find(i=>i.id===id); if(it) it.audio=null; touch(); render(); }
+
+/* ================= dictation ================= */
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+let rec=null, recId=null, recBase='';
+function toggleDictation(id){ if(!SR){ flash(lang==='af'?'Diktering nie ondersteun nie.':'Dictation not supported here.'); return; }
+  if(recId===id){ stopDictation(); return; } if(rec){ stopDictation(); }
+  const ta=document.getElementById('notes_'+id); recBase=ta.value?ta.value.replace(/\s+$/,'')+' ':'';
+  rec=new SR(); rec.lang= lang==='af'?'af-ZA':'en-ZA'; rec.continuous=true; rec.interimResults=true;
+  rec.onresult=e=>{ let fin='',int=''; for(let i=0;i<e.results.length;i++){ const t=e.results[i][0].transcript; if(e.results[i].isFinal)fin+=t; else int+=t; }
+    const it=items.find(x=>x.id===id); const combined=(recBase+fin+int).replace(/\s+/g,' ').trimStart(); ta.value=combined; if(it){ it.notes=combined.trimEnd(); touch(); } };
+  rec.onerror=e=>{ if(e.error==='not-allowed'||e.error==='service-not-allowed') flash(lang==='af'?'Mikrofoon geweier.':'Microphone permission denied.'); else if(e.error==='no-speech') flash(lang==='af'?'Geen spraak nie.':'No speech detected.'); stopDictation(); };
+  rec.onend=()=>{ if(recId===id) stopDictation(); };
+  try{ rec.start(); recId=id; setMic(id,true); }catch(e){ flash('Could not start microphone.'); }
+}
+function stopDictation(){ const id=recId; if(rec){ try{rec.stop();}catch(e){} rec=null; } recId=null; if(id!=null) setMic(id,false); }
+function setMic(id,on){ const b=document.getElementById('mic_'+id); if(!b) return; b.dataset.rec=on?'1':'0'; b.innerHTML=`<span class="dot"></span>${on?T('stop'):T('dictate')}`; }
+
+/* ================= annotation (free / arrow / ellipse) ================= */
+let annotCtx=null, annotImg=new Image(), annotTarget=null, annotShapes=[], annotPen='#ef4444', annotTool='free', drawing=false, startPt=null, curShape=null;
+function openAnnot(id,idx){ annotTarget={id,idx}; annotShapes=[]; const it=items.find(i=>i.id===id); annotImg=new Image();
+  annotImg.onload=()=>{ const cv=document.getElementById('acanvas'); cv.width=annotImg.width; cv.height=annotImg.height; annotCtx=cv.getContext('2d'); redrawAnnot(); document.getElementById('annot').classList.add('on'); };
+  annotImg.src=it.photos[idx]; }
+function setPen(c){ annotPen=c; }
+function setTool(t){ annotTool=t; ['free','arrow','ellipse'].forEach(x=>{ const b=document.getElementById('tool_'+x); if(b) b.classList.toggle('on',x===t); }); }
+function relPos(ev,cv){ const r=cv.getBoundingClientRect(); const t=(ev.touches&&ev.touches[0])||ev; return {x:(t.clientX-r.left)*(cv.width/r.width),y:(t.clientY-r.top)*(cv.height/r.height)}; }
+function startDraw(ev){ ev.preventDefault(); drawing=true; const cv=document.getElementById('acanvas'); const p=relPos(ev,cv); const w=Math.max(3,cv.width/250);
+  startPt=p; if(annotTool==='free'){ curShape={type:'free',color:annotPen,w,pts:[p]}; } else { curShape={type:annotTool,color:annotPen,w,x1:p.x,y1:p.y,x2:p.x,y2:p.y}; } annotShapes.push(curShape); }
+function moveDraw(ev){ if(!drawing) return; ev.preventDefault(); const cv=document.getElementById('acanvas'); const p=relPos(ev,cv);
+  if(curShape.type==='free'){ curShape.pts.push(p); } else { curShape.x2=p.x; curShape.y2=p.y; } redrawAnnot(); }
+function endDraw(){ drawing=false; curShape=null; }
+function drawArrow(ctx,x1,y1,x2,y2,w){ ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  const a=Math.atan2(y2-y1,x2-x1); const hl=Math.max(12,w*5); ctx.beginPath(); ctx.moveTo(x2,y2);
+  ctx.lineTo(x2-hl*Math.cos(a-Math.PI/6),y2-hl*Math.sin(a-Math.PI/6)); ctx.moveTo(x2,y2);
+  ctx.lineTo(x2-hl*Math.cos(a+Math.PI/6),y2-hl*Math.sin(a+Math.PI/6)); ctx.stroke(); }
+function redrawAnnot(){ const cv=document.getElementById('acanvas'); annotCtx.drawImage(annotImg,0,0);
+  annotShapes.forEach(s=>{ annotCtx.strokeStyle=s.color; annotCtx.lineWidth=s.w; annotCtx.lineCap='round'; annotCtx.lineJoin='round';
+    if(s.type==='free'){ annotCtx.beginPath(); s.pts.forEach((p,i)=>i?annotCtx.lineTo(p.x,p.y):annotCtx.moveTo(p.x,p.y)); annotCtx.stroke(); }
+    else if(s.type==='arrow'){ drawArrow(annotCtx,s.x1,s.y1,s.x2,s.y2,s.w); }
+    else if(s.type==='ellipse'){ annotCtx.beginPath(); annotCtx.ellipse((s.x1+s.x2)/2,(s.y1+s.y2)/2,Math.abs(s.x2-s.x1)/2,Math.abs(s.y2-s.y1)/2,0,0,Math.PI*2); annotCtx.stroke(); } }); }
+function undoAnnot(){ annotShapes.pop(); redrawAnnot(); }
+function closeAnnot(save){ if(save&&annotTarget){ const cv=document.getElementById('acanvas'); const it=items.find(i=>i.id===annotTarget.id); if(it){ it.photos[annotTarget.idx]=cv.toDataURL('image/jpeg',0.8); touch(); } }
+  document.getElementById('annot').classList.remove('on'); annotTarget=null; render(); }
+
+/* ================= filters ================= */
+function toggleFilter(g,v){ const s=activeFilters[g]; if(s.has(v)) s.delete(v); else s.add(v); render(); }
+function passesFilter(it){ if(activeFilters.status.size&&!activeFilters.status.has(it.status)) return false;
+  if(activeFilters.trade.size&&!activeFilters.trade.has(it.trade)) return false;
+  if(activeFilters.priority.size&&!activeFilters.priority.has(it.priority)) return false; return true; }
+function renderFilters(){ const f=document.getElementById('filters');
+  const groups=[['status',['complete','incomplete','defect']],['trade',TRADES],['priority',PRIORITIES]]; let html='';
+  groups.forEach(([g,vals])=>vals.forEach(v=>{ const on=activeFilters[g].has(v)?1:0; const lbl=(g==='status')?T(v):v;
+    html+=`<div class="fchip" data-on="${on}" onclick="toggleFilter('${g}','${v.replace(/'/g,"\\'")}')">${lbl}</div>`; })); f.innerHTML=html; }
+
+/* ================= render ================= */
+function itemCard(it){
+  const div=document.createElement('div'); div.className='item'+(it.status==='complete'?' closed':'');
+  const photoHtml=it.photos.map((p,pi)=>`<div class="thumb"><img src="${p}"><button class="x" onclick="delPhoto(${js(it.id)},${pi})">&times;</button><button class="edit" onclick="openAnnot(${js(it.id)},${pi})">${T('markup')}</button></div>`).join('');
+  const gpsHtml=it.gps?`<span class="coord">${it.gps.lat.toFixed(5)}, ${it.gps.lng.toFixed(5)} (±${it.gps.acc}m)</span><button onclick="captureGPS(${js(it.id)})">${T('update')}</button>`:`<button onclick="captureGPS(${js(it.id)})">📍 ${T('capgps')}</button>`;
+  const histHtml=it.history&&it.history.length?`<div class="hist">${it.history.map(h=>`<div class="h-line">${h.ts} — <b>${h.from} → ${h.to}</b></div>`).join('')}</div>`:'';
+  const audioHtml=it.audio?`<div class="audio-row"><audio controls src="${it.audio}"></audio><button class="recbtn" onclick="delAudio(${js(it.id)})">✕</button></div>`:`<div class="audio-row"><button class="recbtn" id="rec_${it.id}" data-rec="0" onclick="toggleAudio(${js(it.id)})">🎙 ${T('recmemo')}</button></div>`;
+  const tradeOpts=['<option value="">— '+T('trade')+' —</option>'].concat(TRADES.map(t=>`<option value="${t}"${it.trade===t?' selected':''}>${t}</option>`)).join('');
+  const prioOpts=['<option value="">— '+T('priority')+' —</option>'].concat(PRIORITIES.map(p=>`<option value="${p}"${it.priority===p?' selected':''}>${p}</option>`)).join('');
+  div.innerHTML=`
+    <div class="item-head">
+      <span class="item-no">SNAG ${String(it.snag).padStart(3,'0')}</span>
+      <span class="loc" id="loclbl_${it.id}">${it.loc||'(no location set)'}</span>
+      <button class="del" onclick="delItem(${js(it.id)})">✕</button>
+    </div>
+    <div class="item-body">
+      <div class="field"><label>${T('loc')}</label><input value="${escAttr(it.loc)}" oninput="bind(${js(it.id)},'loc',this)" placeholder="e.g. Plant room, Roof level AHU-2"></div>
+      <div class="grid2">
+        <div class="field"><label>${T('trade')}</label><select onchange="bind(${js(it.id)},'trade',this)">${tradeOpts}</select></div>
+        <div class="field"><label>${T('priority')}</label><select onchange="bind(${js(it.id)},'priority',this)">${prioOpts}</select></div>
+      </div>
+      <div class="field"><label>Status</label>
+        <div class="status-row">
+          <div class="chip" data-v="complete" data-on="${it.status==='complete'?1:0}" onclick="setStatus(${js(it.id)},'complete')">${T('complete')}</div>
+          <div class="chip" data-v="incomplete" data-on="${it.status==='incomplete'?1:0}" onclick="setStatus(${js(it.id)},'incomplete')">${T('incomplete')}</div>
+          <div class="chip" data-v="defect" data-on="${it.status==='defect'?1:0}" onclick="setStatus(${js(it.id)},'defect')">${T('defect')}</div>
+        </div>${histHtml}
+      </div>
+      <div class="field"><div class="notes-head"><label>${T('notes')}</label>
+        <button class="mic" id="mic_${it.id}" data-rec="0" onclick="toggleDictation(${js(it.id)})"><span class="dot"></span>${T('dictate')}</button></div>
+        <textarea id="notes_${it.id}" oninput="bind(${js(it.id)},'notes',this)" placeholder="...">${escHtml(it.notes)}</textarea>
+        ${audioHtml}
+      </div>
+      <div class="field"><label>${T('photos')}</label>
+        <div class="photos">${photoHtml}</div>
+        <div class="photo-btns">
+          <button class="pbtn" onclick="pickPhoto(${js(it.id)},true)">📷 ${T('camera')}</button>
+          <button class="pbtn" onclick="pickPhoto(${js(it.id)},false)">🖼 ${T('gallery')}</button>
+        </div>
+        <div class="gps">${gpsHtml}</div>
+        <div class="ts">${T('logged')}: ${it.ts}</div>
+      </div>
+    </div>`;
+  return div;
+}
+function render(){
+  if(recId!=null) stopDictation();
+  renderInspSelector(); renderFilters(); applyLangStatic();
+  const c=document.getElementById('items'); c.innerHTML='';
+  const shown=items.filter(passesFilter);
+  if(shown.length===0){ c.innerHTML=`<div class="panel" style="text-align:center;color:var(--muted);font-size:12px">${lang==='af'?'Geen items pas by die filter nie.':'No items match the current filter.'}</div>`; return; }
+  const open=shown.filter(i=>i.status!=='complete').sort((a,b)=>a.snag-b.snag);
+  const closed=shown.filter(i=>i.status==='complete').sort((a,b)=>a.snag-b.snag);
+  open.forEach(it=>c.appendChild(itemCard(it)));
+  if(closed.length){ const d=document.createElement('div'); d.className='divider'; d.textContent=T('closed')+' ('+closed.length+')'; c.appendChild(d);
+    closed.forEach(it=>c.appendChild(itemCard(it))); }
+}
+function applyLangStatic(){ /* placeholder hook; static labels handled in applyLang */ }
+function js(v){ return typeof v==='string'?`'${v}'`:v; }
+function escHtml(s){return (s||'').replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));}
+function escAttr(s){return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;');}
+
+/* ================= form helpers ================= */
+function meta(){return{firm:val('f_firm'),details:val('f_details'),name:val('p_name'),no:val('p_no'),client:val('p_client'),addr:val('p_addr'),inspector:val('p_inspector'),date:val('p_date'),weather:val('p_weather')};}
+function val(id){const e=document.getElementById(id);return e?e.value:'';}
+function setVal(id,v){const e=document.getElementById(id); if(e) e.value=v||'';}
+function flash(msg){const h=document.getElementById('hint'); h.dataset.flashing='1'; h.textContent=msg; clearTimeout(h._t); h._t=setTimeout(()=>{ h.dataset.flashing=''; h.textContent=T('autosave'); },2600);}
+
+/* ================= backup / restore (current inspection) ================= */
+function exportJSON(){ saveCurrentToStore(); const blob=new Blob([JSON.stringify(curSnapshot(),null,2)],{type:'application/json'});
+  const m=meta(); const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=`Snag-${(m.no||'inspection').replace(/[^\w-]/g,'')}-${m.date||''}.json`; a.click(); URL.revokeObjectURL(a.href); flash(lang==='af'?'Rugsteun afgelaai.':'Backup downloaded.'); }
+function importJSON(){ const inp=document.createElement('input'); inp.type='file'; inp.accept='application/json,.json';
+  inp.onchange=e=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader();
+    r.onload=ev=>{ try{ const d=JSON.parse(ev.target.result);
+      if(!confirm(lang==='af'?'Laai as nuwe inspeksie?':'Load as a new inspection?')) return;
+      saveCurrentToStore(); const id=uid(); store.inspections[id]=d; store.order.push(id); store.current=id;
+      loadCurrentFromStore(); render(); renderInspSelector(); persistStore(); flash(lang==='af'?'Rugsteun herstel.':'Backup restored.');
+    }catch(err){ flash(lang==='af'?'Ongeldige lêer.':'Invalid backup file.'); } }; r.readAsText(f); };
+  inp.click(); }
+
+/* ================= CSV export ================= */
+function csvCell(v){ v=(v==null?'':String(v)); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }
+function exportCSV(){ saveCurrentToStore(); const m=meta();
+  const head=['Snag','Status','Trade','Priority','Location','Notes','GPS Lat','GPS Lng','Logged'];
+  const rows=[...items].sort((a,b)=>a.snag-b.snag).map(it=>[
+    String(it.snag).padStart(3,'0'),it.status||'',it.trade||'',it.priority||'',it.loc||'',it.notes||'',
+    it.gps?it.gps.lat.toFixed(6):'',it.gps?it.gps.lng.toFixed(6):'',it.ts||'']);
+  const lines=[head].concat(rows).map(r=>r.map(csvCell).join(',')).join('\r\n');
+  const blob=new Blob(['\ufeff'+lines],{type:'text/csv;charset=utf-8'}); const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob); a.download=`Snag-${(m.no||'inspection').replace(/[^\w-]/g,'')}-${m.date||''}.csv`; a.click(); URL.revokeObjectURL(a.href); flash(lang==='af'?'CSV afgelaai.':'CSV downloaded.'); }
+
+/* ================= PDF ================= */
+async function exportPDF(){
+  saveCurrentToStore();
+  const { jsPDF }=window.jspdf; const doc=new jsPDF({unit:'mm',format:'a4'});
+  const W=210,H=297,M=15; let y=M; const m=meta();
+  const line=(yy,light)=>{doc.setDrawColor(light?210:170);doc.setLineWidth(0.2);doc.line(M,yy,W-M,yy);};
+  const ck=(need)=>{ if(y+need>H-20){doc.addPage(); y=M;} };
+  let headBottom=y;
+  if(logoData){ try{ const d=await imgDim(logoData); const lw=28,lh=Math.min(28,lw*d.h/d.w); doc.addImage(logoData,'JPEG',M,y,lw,lh); headBottom=y+lh; }catch(e){} }
+  const tx=logoData?M+34:M;
+  doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(20); if(m.firm) doc.text(m.firm,tx,y+5);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(90); let dy=y+10;
+  (m.details||'').split('\n').filter(Boolean).forEach(l=>{ doc.text(l,tx,dy); dy+=4; });
+  y=Math.max(headBottom,dy,y+12)+3; line(y); y+=7;
+  doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(20); doc.text(T('pdf_title'),M,y); y+=6;
+  doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(90); doc.text(T('pdf_sub'),M,y); y+=5;
+  const L=I18N[lang];
+  const rows=[[L.pname,m.name],[L.pno,m.no],[L.client,m.client],[L.addr,m.addr],[L.insp,m.inspector],[L.date,m.date],[L.weather,m.weather]];
+  doc.setFontSize(9.5);
+  rows.forEach(r=>{ doc.setFont('helvetica','bold'); doc.setTextColor(40); doc.text(r[0],M,y);
+    doc.setFont('helvetica','normal'); doc.setTextColor(20); doc.text(doc.splitTextToSize(r[1]||'—',W-M-58),M+48,y); y+=6; });
+  y+=1; line(y); y+=8;
+  const sl={complete:T('complete').toUpperCase(),incomplete:T('incomplete').toUpperCase(),defect:T('defect').toUpperCase(),'':'—'};
+  const flagged=items.filter(i=>i.status==='defect'||i.status==='incomplete').sort((a,b)=>a.snag-b.snag);
+  if(flagged.length){
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20); doc.text('1.0  '+T('pdf_summary'),M,y); y+=6;
+    const cols=[['Snag',16],['Status',26],[T('trade'),30],[T('loc'),62],['Pri.',20]];
+    doc.setFillColor(28,33,43); doc.rect(M,y-4.5,W-2*M,7,'F'); doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(255);
+    let cx=M+1.5; cols.forEach(c=>{ doc.text(String(c[0]),cx,y); cx+=c[1]; }); y+=6;
+    doc.setFont('helvetica','normal'); doc.setTextColor(25);
+    flagged.forEach((it,i)=>{ ck(7); if(i%2){ doc.setFillColor(244,245,247); doc.rect(M,y-4.2,W-2*M,6,'F'); } cx=M+1.5;
+      [String(it.snag).padStart(3,'0'),sl[it.status],it.trade||'—',it.loc||'—',it.priority||'—'].forEach((t,j)=>{ doc.text(doc.splitTextToSize(t,cols[j][1]-2),cx,y); cx+=cols[j][1]; }); y+=6; });
+    y+=3; line(y,true); y+=8;
+  }
+  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20); ck(10); doc.text((flagged.length?'2.0':'1.0')+'  '+T('pdf_detail'),M,y); y+=7;
+  const ordered=[...items].sort((a,b)=>a.snag-b.snag);
+  for(const it of ordered){ ck(30);
+    doc.setFillColor(28,33,43); doc.rect(M,y-4.5,W-2*M,7,'F'); doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(255);
+    doc.text(`SNAG ${String(it.snag).padStart(3,'0')}`,M+2,y); doc.setTextColor(250,200,60);
+    const tag=[it.trade,it.priority].filter(Boolean).join(' · '); doc.text(`${sl[it.status]||'—'}${tag?'   ['+tag+']':''}`,W-M-2,y,{align:'right'}); y+=8; doc.setTextColor(20);
+    const fld=(lbl,txt)=>{ doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.text(lbl,M,y); doc.setFont('helvetica','normal'); const t=doc.splitTextToSize(txt||'—',W-M-30); doc.text(t,M+26,y); y+=5*t.length+1; };
+    fld(T('pdf_loc'),it.loc); fld(T('pdf_logged'),it.ts); if(it.gps) fld('GPS:',`${it.gps.lat.toFixed(5)}, ${it.gps.lng.toFixed(5)} (±${it.gps.acc} m)`);
+    if(it.audio) fld('Audio:',lang==='af'?'(stemmemo in rugsteun)':'(voice memo in backup)');
+    doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.text(T('pdf_notes'),M,y); y+=5; doc.setFont('helvetica','normal');
+    doc.splitTextToSize(it.notes||'—',W-2*M).forEach(t=>{ ck(6); doc.text(t,M,y); y+=5; });
+    if(it.history&&it.history.length){ y+=1; doc.setFont('helvetica','italic'); doc.setFontSize(8); doc.setTextColor(110); doc.text('Status history:',M,y); y+=4;
+      it.history.forEach(h=>{ ck(5); doc.text(`• ${h.ts}: ${h.from} → ${h.to}`,M+3,y); y+=4; }); doc.setTextColor(20); }
+    y+=2;
+    if(it.photos.length){ const pw=(W-2*M-6)/2,gap=6; let col=0,rowH=0;
+      for(const ph0 of it.photos){ const dim=await imgDim(ph0); const ph=pw*dim.h/dim.w; if(col===0) ck(ph+6);
+        const x=M+col*(pw+gap); try{ doc.addImage(ph0,'JPEG',x,y,pw,ph); }catch(e){} doc.setDrawColor(200); doc.rect(x,y,pw,ph); rowH=Math.max(rowH,ph); col++; if(col===2){ y+=rowH+gap; col=0; rowH=0; } }
+      if(col===1) y+=rowH+gap; }
+    y+=2; line(y,true); y+=7;
+  }
+  if(m.inspector){ ck(34); doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20); doc.text(T('pdf_signoff'),M,y); y+=10;
+    doc.setDrawColor(120); doc.setLineWidth(0.3); doc.line(M,y,M+70,y); doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(60);
+    doc.text(lang==='af'?'Inspekteur (handtekening)':'Inspector (signature)',M,y+5); doc.text(`${lang==='af'?'Naam':'Name'}:  ${m.inspector}`,M,y+12); doc.text(`${lang==='af'?'Datum':'Date'}:  ${m.date||''}`,M,y+18); }
+  const pages=doc.getNumberOfPages();
+  for(let p=1;p<=pages;p++){ doc.setPage(p); doc.setFontSize(8); doc.setTextColor(120);
+    doc.text(`${m.no?m.no+' — ':''}${m.name||'Inspection'}`,M,H-8); doc.text(`${lang==='af'?'Bladsy':'Page'} ${p}/${pages}`,W-M,H-8,{align:'right'}); }
+  doc.save(`Snag-${(m.no||'inspection').replace(/[^\w-]/g,'')}-${m.date||''}.pdf`);
+}
+function imgDim(src){return new Promise(res=>{const i=new Image();i.onload=()=>res({w:i.width,h:i.height});i.onerror=()=>res({w:4,h:3});i.src=src;});}
+
+/* ================= canvas events ================= */
+window.addEventListener('load',()=>{ const cv=document.getElementById('acanvas');
+  ['mousedown','touchstart'].forEach(e=>cv.addEventListener(e,startDraw,{passive:false}));
+  ['mousemove','touchmove'].forEach(e=>cv.addEventListener(e,moveDraw,{passive:false}));
+  ['mouseup','mouseleave','touchend','touchcancel'].forEach(e=>cv.addEventListener(e,endDraw)); });
+window.addEventListener('beforeunload',()=>{ saveCurrentToStore(); persistStore(); });
+
+/* ================= init ================= */
+loadStore(); applyLang(); loadCurrentFromStore();
+if(items.length===0){ addItem(); } else { render(); }
+renderInspSelector();
+</script>
+</body>
+</html>
