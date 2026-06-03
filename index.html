@@ -394,13 +394,26 @@ function delAudio(id){ const it=items.find(i=>i.id===id); if(it) it.audio=null; 
 
 /* ================= dictation ================= */
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-let rec=null, recId=null, recBase='';
+let rec=null, recId=null, recOrigBase='';
 function toggleDictation(id){ if(!SR){ flash(lang==='af'?'Diktering nie ondersteun nie.':'Dictation not supported here.'); return; }
   if(recId===id){ stopDictation(); return; } if(rec){ stopDictation(); }
-  const ta=document.getElementById('notes_'+id); recBase=ta.value?ta.value.replace(/\s+$/,'')+' ':'';
+  const ta=document.getElementById('notes_'+id);
+  // The text that existed BEFORE dictation started. Never changes during the session.
+  recOrigBase = ta.value ? ta.value.replace(/\s+$/,'')+' ' : '';
   rec=new SR(); rec.lang= lang==='af'?'af-ZA':'en-ZA'; rec.continuous=true; rec.interimResults=true;
-  rec.onresult=e=>{ let fin='',int=''; for(let i=0;i<e.results.length;i++){ const t=e.results[i][0].transcript; if(e.results[i].isFinal)fin+=t; else int+=t; }
-    const it=items.find(x=>x.id===id); const combined=(recBase+fin+int).replace(/\s+/g,' ').trimStart(); ta.value=combined; if(it){ it.notes=combined.trimEnd(); touch(); } };
+  rec.onresult=e=>{
+    // Rebuild the WHOLE note from scratch each event: original base + every final + current interim.
+    // Reading the full results array fresh (not accumulating) makes re-fired finals harmless —
+    // they just overwrite rather than append, so no duplication on Samsung/Android engines.
+    let finals='', interim='';
+    for(let i=0;i<e.results.length;i++){
+      const t=e.results[i][0].transcript;
+      if(e.results[i].isFinal) finals+=t+' '; else interim+=t;
+    }
+    const it=items.find(x=>x.id===id);
+    const shown=(recOrigBase+finals+interim).replace(/\s+/g,' ').trimStart();
+    ta.value=shown; if(it){ it.notes=shown.trimEnd(); touch(); }
+  };
   rec.onerror=e=>{ if(e.error==='not-allowed'||e.error==='service-not-allowed') flash(lang==='af'?'Mikrofoon geweier.':'Microphone permission denied.'); else if(e.error==='no-speech') flash(lang==='af'?'Geen spraak nie.':'No speech detected.'); stopDictation(); };
   rec.onend=()=>{ if(recId===id) stopDictation(); };
   try{ rec.start(); recId=id; setMic(id,true); }catch(e){ flash('Could not start microphone.'); }
