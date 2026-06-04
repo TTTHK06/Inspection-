@@ -11,6 +11,8 @@
 <meta name="theme-color" content="#0f1115">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Crect width='180' height='180' fill='%230f1115'/%3E%3Crect x='30' y='30' width='120' height='120' rx='16' fill='none' stroke='%23ff7a18' stroke-width='10'/%3E%3Cpath d='M60 92l22 22 40-50' fill='none' stroke='%23facc15' stroke-width='12' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>if(window.pdfjsLib){ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; }</script>
 <style>
   :root{
     --bg:#0f1115; --panel:#171a21; --panel2:#1d212b; --line:#2a2f3a;
@@ -142,6 +144,33 @@
   .modal-tools button.prim{background:var(--accent); color:#1a1209; border-color:var(--accent);}
   .modal-tools button.on{border-color:var(--accent2); color:var(--accent2);}
   .modal-tools .swatch{width:30px; height:30px; padding:0; border-radius:50%;}
+
+  /* plan panel */
+  .plan-empty{color:var(--muted); font-size:12px; text-align:center; padding:8px 0;}
+  .plan-pagebar{display:flex; gap:8px; align-items:center; margin-bottom:10px; flex-wrap:wrap;}
+  .plan-pagebar select{flex:1; min-width:120px;}
+  .plan-pagebar button{border:1px solid var(--line); background:var(--bg); color:var(--ink); border-radius:7px; padding:9px 11px; font:inherit; font-size:12px; cursor:pointer;}
+  .plan-modes{display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap;}
+  .plan-modes .pm{flex:1; min-width:90px; border:1px solid var(--line); background:var(--bg); color:var(--muted); border-radius:7px; padding:8px 6px; font:inherit; font-size:11px; cursor:pointer; text-transform:uppercase; letter-spacing:.4px; text-align:center;}
+  .plan-modes .pm[data-on="1"]{border-color:var(--accent); color:var(--accent2); background:rgba(255,122,24,.12);}
+  .plan-stage{position:relative; width:100%; overflow:hidden; border:1px solid var(--line); border-radius:8px; background:#fff; height:60vh; touch-action:none;}
+  .plan-zoomwrap{position:absolute; top:0; left:0; transform-origin:0 0; will-change:transform;}
+  .plan-zoomwrap canvas{display:block;}
+  .plan-overlay{position:absolute; inset:0;}
+  .plan-zoombar{display:flex; gap:8px; align-items:center; margin-bottom:10px; flex-wrap:wrap; font-size:11px; color:var(--muted);}
+  .plan-zoombar button{border:1px solid var(--line); background:var(--bg); color:var(--ink); border-radius:7px; min-width:38px; padding:8px 10px; font:inherit; font-size:14px; cursor:pointer;}
+  .plan-zoombar #planZoomLbl{min-width:44px; text-align:center;}
+  .plan-pan-hint{font-size:9px; color:var(--na); letter-spacing:.3px;}
+  .pin{position:absolute; transform:translate(-50%,-100%); cursor:pointer; font-size:0; z-index:2;}
+  .pin svg{width:26px; height:34px; filter:drop-shadow(0 1px 2px rgba(0,0,0,.5));}
+  .pin span{position:absolute; top:5px; left:50%; transform:translateX(-50%); color:#fff; font:700 10px/1 monospace;}
+  .roommark{position:absolute; transform:translate(-50%,-50%); background:rgba(34,197,94,.9); color:#04210f; font:700 9px/1 monospace; padding:3px 6px; border-radius:10px; z-index:1; white-space:nowrap; pointer-events:none;}
+  .roombox{position:absolute; border:2px solid rgba(34,197,94,.9); background:rgba(34,197,94,.12); z-index:0;}
+  .roombox span{position:absolute; top:-9px; left:4px; background:rgba(34,197,94,.95); color:#04210f; font:700 9px/1 monospace; padding:2px 5px; border-radius:4px;}
+  .plan-hint{font-size:10px; color:var(--na); margin-top:8px; letter-spacing:.3px;}
+  .roomlist{display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;}
+  .roomtag{border:1px solid var(--line); background:var(--bg); color:var(--ok); border-radius:14px; padding:4px 10px; font-size:10px; display:inline-flex; gap:6px; align-items:center;}
+  .roomtag button{border:none; background:none; color:var(--bad); cursor:pointer; font-size:12px; padding:0;}
 </style>
 </head>
 <body>
@@ -196,6 +225,41 @@
     </div>
   </section>
 
+  <section class="panel">
+    <h2 id="t_plan_h">Plan / Drawing</h2>
+    <div id="planEmpty" class="plan-empty">No plan loaded. Import a PDF to pin snags to locations.</div>
+    <div id="planBody" style="display:none;">
+      <div class="plan-pagebar">
+        <select id="planPageSel" onchange="showPlanPage(+this.value)"></select>
+        <button onclick="renamePlanPage()" id="t_planrename">Rename</button>
+        <button onclick="deletePlanPage()" id="t_plandel">✕ Page</button>
+      </div>
+      <div class="plan-modes" id="planModes">
+        <div class="pm" data-mode="pin" data-on="1" onclick="setPlanMode('pin')" id="t_pmpin">Pin snag</div>
+        <div class="pm" data-mode="room" data-on="0" onclick="setPlanMode('room')" id="t_pmroom">Mark room</div>
+        <div class="pm" data-mode="zone" data-on="0" onclick="setPlanMode('zone')" id="t_pmzone">Draw room</div>
+      </div>
+      <div class="plan-zoombar">
+        <button onclick="planZoom(-1)">−</button>
+        <span id="planZoomLbl">100%</span>
+        <button onclick="planZoom(1)">+</button>
+        <button onclick="planZoomReset()" id="t_planfit">Fit</button>
+        <span class="plan-pan-hint" id="t_panhint">drag to pan · pinch/wheel to zoom</span>
+      </div>
+      <div class="plan-stage" id="planStage">
+        <div class="plan-zoomwrap" id="planZoomWrap">
+          <canvas id="planCanvas"></canvas>
+          <div class="plan-overlay" id="planOverlay"></div>
+        </div>
+      </div>
+      <div class="plan-hint" id="planHint"></div>
+      <div class="roomlist" id="roomList"></div>
+    </div>
+    <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="pbtn" onclick="importPlan()" id="t_planimport">Import PDF Plan</button>
+    </div>
+  </section>
+
   <div class="filters" id="filters"></div>
   <div id="items"></div>
   <button class="add" onclick="addItem()" id="t_additem">＋ Add Inspection Item</button>
@@ -241,6 +305,8 @@ const I18N={
     markup:'Mark up',capgps:'Capture GPS',update:'Update',logged:'Logged',
     recmemo:'Record memo',stopmemo:'Stop',autosave:'Auto-saving to this browser. Backup regularly.',
     dupitem:'Duplicate item',reinspect:'Re-inspect',
+    plan_h:'Plan / Drawing',planimport:'Import PDF Plan',planrename:'Rename',plandel:'✕ Page',
+    pmpin:'Pin snag',pmroom:'Mark room',pmzone:'Draw room',room:'Room',planlink:'Plan',nolink:'Not on plan',
     pdf_title:'INSPECTION SNAG LIST',pdf_sub:'Works completed — site inspection record',
     pdf_summary:'Outstanding Items Summary',pdf_detail:'Inspection Detail',pdf_signoff:'Sign-off',
     pdf_loc:'Location:',pdf_logged:'Logged:',pdf_notes:'Notes:'},
@@ -256,6 +322,8 @@ const I18N={
     markup:'Merk',capgps:'Kry GPS',update:'Werk by',logged:'Gelog',
     recmemo:'Neem memo op',stopmemo:'Stop',autosave:'Outomaties gestoor in hierdie blaaier. Rugsteun gereeld.',
     dupitem:'Dupliseer item',reinspect:'Herinspeksie',
+    plan_h:'Plan / Tekening',planimport:'Voer PDF-plan in',planrename:'Hernoem',plandel:'✕ Bladsy',
+    pmpin:'Pen fout',pmroom:'Merk kamer',pmzone:'Teken kamer',room:'Kamer',planlink:'Plan',nolink:'Nie op plan',
     pdf_title:'INSPEKSIE FOUTLYS',pdf_sub:'Werk voltooi — terrein-inspeksierekord',
     pdf_summary:'Uitstaande Items Opsomming',pdf_detail:'Inspeksiebesonderhede',pdf_signoff:'Goedkeuring',
     pdf_loc:'Ligging:',pdf_logged:'Gelog:',pdf_notes:'Notas:'}
@@ -273,6 +341,8 @@ function applyLang(){
   set('t_backup','backup');set('t_restore','restore');set('t_csv','csv');set('t_pdf','pdf');
   set('t_new','new');set('t_dup','dup');set('t_delinsp','delinsp');
   const ri=document.getElementById('t_reinspect'); if(ri) ri.textContent=T('reinspect');
+  set('t_plan_h','plan_h');set('t_planimport','planimport');set('t_planrename','planrename');set('t_plandel','plandel');
+  set('t_pmpin','pmpin');set('t_pmroom','pmroom');set('t_pmzone','pmzone');
   const h=document.getElementById('hint'); if(!h.dataset.flashing) h.textContent=T('autosave');
 }
 function toggleLang(){ lang = lang==='en'?'af':'en'; localStorage.setItem('snag_lang',lang); applyLang(); render(); }
@@ -282,6 +352,10 @@ function toggleLang(){ lang = lang==='en'?'af':'en'; localStorage.setItem('snag_
 const STORE_KEY='snag_store';
 let store={inspections:{},order:[],current:null};
 let items=[], seq=0, logoData=null;
+let plans=[];            // [{id,name,img(dataURL),w,h,rooms:[{name,fx,fy}],zones:[{name,fx,fy,fw,fh}]}]
+let curPlanPage=-1;      // index into plans, -1 = none
+let planMode='pin';      // 'pin' | 'room' | 'zone'
+let zoneDraft=null;      // in-progress zone box while dragging
 let activeFilters={status:new Set(),trade:new Set(),priority:new Set()};
 
 const TRADES=['HVAC','Wet Services','Fire','General/Other'];
@@ -301,9 +375,9 @@ function persistStore(){
   try{ localStorage.setItem(STORE_KEY, JSON.stringify(store)); return true; }
   catch(e){ flash(lang==='af'?'Stoor misluk — berging vol. Rugsteun na lêer.':'Save failed — storage full. Back up to file.'); return false; }
 }
-function blankSnapshot(){ return {meta:{firm:'',details:'',name:'',no:'',client:'',addr:'',inspector:'',date:new Date().toISOString().slice(0,10),weather:''}, items:[], seq:0, logo:null, v:3}; }
+function blankSnapshot(){ return {meta:{firm:'',details:'',name:'',no:'',client:'',addr:'',inspector:'',date:new Date().toISOString().slice(0,10),weather:''}, items:[], seq:0, logo:null, plans:[], v:4}; }
 
-function curSnapshot(){ return {meta:meta(), items, seq, logo:logoData, v:3}; }
+function curSnapshot(){ return {meta:meta(), items, seq, logo:logoData, plans, v:4}; }
 function saveCurrentToStore(){ if(store.current){ store.inspections[store.current]=curSnapshot(); } }
 
 let autosaveTimer=null;
@@ -319,9 +393,11 @@ function applySnapshotToForm(d){
   setVal('f_firm',m.firm);setVal('f_details',m.details);setVal('p_name',m.name);setVal('p_no',m.no);
   setVal('p_client',m.client);setVal('p_addr',m.addr);setVal('p_inspector',m.inspector);
   setVal('p_date',m.date||new Date().toISOString().slice(0,10));setVal('p_weather',m.weather);
-  items=(d.items||[]).map(it=>Object.assign({trade:'',priority:'',gps:null,history:[],snag:0,audio:null},it));
+  items=(d.items||[]).map(it=>Object.assign({trade:'',priority:'',gps:null,history:[],snag:0,audio:null,room:'',planRef:null},it));
   seq=d.seq || items.reduce((mx,i)=>Math.max(mx,i.snag||0),0);
   logoData=d.logo||null; renderLogo();
+  plans=(d.plans||[]).map(p=>Object.assign({id:'',name:'',img:'',w:0,h:0,rooms:[],zones:[]},p));
+  curPlanPage = plans.length?0:-1; renderPlanPanel();
 }
 function inspLabel(d){ const m=d.meta||{}; const nm=m.name||'(untitled)'; return (m.no?m.no+' — ':'')+nm; }
 function renderInspSelector(){
@@ -343,13 +419,13 @@ function deleteInspection(){
 /* ================= items ================= */
 function addItem(data){
   if(data){ items.push(data); }
-  else{ seq++; items.push({id:Date.now()+Math.random(),snag:seq,loc:'',status:'',trade:'',priority:'',notes:'',photos:[],audio:null,gps:null,ts:nowStamp(),history:[]}); }
+  else{ seq++; items.push({id:uid(),snag:seq,loc:'',status:'',trade:'',priority:'',notes:'',photos:[],audio:null,gps:null,ts:nowStamp(),history:[]}); }
   touch(); render();
 }
 function delItem(id){ if(!confirm(lang==='af'?'Skrap hierdie item?':'Delete this item?')) return; items=items.filter(i=>i.id!==id); touch(); render(); }
 function dupItem(id){ const src=items.find(i=>i.id===id); if(!src) return;
   seq++; const copy=JSON.parse(JSON.stringify(src));
-  copy.id=Date.now()+Math.random(); copy.snag=seq; copy.status=''; copy.history=[]; copy.ts=nowStamp(); copy.photos=[]; copy.audio=null;
+  copy.id=uid(); copy.snag=seq; copy.status=''; copy.history=[]; copy.ts=nowStamp(); copy.photos=[]; copy.audio=null;
   // keep loc/trade/priority/notes as a starting point; clear evidence so it's a fresh observation
   const idx=items.findIndex(i=>i.id===id); items.splice(idx+1,0,copy); touch(); render();
   flash(lang==='af'?'Item gedupliseer.':'Item duplicated.');
@@ -364,11 +440,11 @@ function carryForward(){
   const today=new Date().toISOString().slice(0,10);
   let ns=1;
   const carried=open.map(it=>{ const c=JSON.parse(JSON.stringify(it));
-    c.id=Date.now()+Math.random()+ns; c.snag=ns++;
+    c.id=uid(); c.snag=ns++;
     c.history=(c.history||[]).concat([{ts:nowStamp(),from:c.status||'(none)',to:'re-inspect'}]);
     return c; });
   const snap={ meta:Object.assign({},m,{date:today, name:(m.name||'')+(lang==='af'?' (herinspeksie)':' (re-inspection)')}),
-    items:carried, seq:carried.length, logo:src.logo||null, v:3 };
+    items:carried, seq:carried.length, logo:src.logo||null, plans:JSON.parse(JSON.stringify(src.plans||[])), v:4 };
   const id=uid(); store.inspections[id]=snap; store.order.push(id); store.current=id;
   loadCurrentFromStore(); render(); renderInspSelector(); persistStore();
   flash(lang==='af'?'Herinspeksie geskep met uitstaande items.':'Re-inspection created with outstanding items.');
@@ -376,7 +452,7 @@ function carryForward(){
 function setStatus(id,val){ const it=items.find(i=>i.id===id); if(!it) return; const old=it.status;
   it.status=(it.status===val)?'':val; if(it.status&&it.status!==old){ it.history.push({ts:nowStamp(),from:old||'(none)',to:it.status}); } touch(); render(); }
 function bind(id,key,el){ const it=items.find(i=>i.id===id); if(it) it[key]=el.value; if(key==='loc') updateLocLabel(id,el.value); touch(); }
-function updateLocLabel(id,val){ const lbl=document.querySelector(`#loclbl_${id}`); if(lbl) lbl.textContent=val||'(no location set)'; }
+function updateLocLabel(id,val){ const lbl=document.getElementById('loclbl_'+id); if(lbl) lbl.textContent=val||'(no location set)'; }
 
 /* ================= GPS ================= */
 function captureGPS(id){ if(!navigator.geolocation){ flash('Geolocation not available.'); return; }
@@ -386,6 +462,237 @@ function captureGPS(id){ if(!navigator.geolocation){ flash('Geolocation not avai
     err=>{ flash(err.code===1?(lang==='af'?'Liggingtoestemming geweier.':'Location permission denied.'):'Could not get location.'); },
     {enableHighAccuracy:true,timeout:10000,maximumAge:0});
 }
+
+/* ================= plan / drawing ================= */
+function pid(){ return 'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,5); }
+
+async function importPlan(){
+  if(!window.pdfjsLib){ flash(lang==='af'?'PDF-leser nie gelaai nie. Het jy internet?':'PDF reader not loaded. Need internet on first load.'); return; }
+  const inp=document.createElement('input'); inp.type='file'; inp.accept='application/pdf,.pdf';
+  inp.onchange=e=>{ const f=e.target.files[0]; if(f) loadPlanFromFile(f); };
+  inp.click();
+}
+
+// Render every page of a PDF File into plan records. Extracted from the file picker
+// so the import pipeline can be driven/tested without a native file dialog.
+async function loadPlanFromFile(f){
+  if(!window.pdfjsLib){ flash(lang==='af'?'PDF-leser nie gelaai nie. Het jy internet?':'PDF reader not loaded. Need internet on first load.'); return; }
+  flash(lang==='af'?'Laai plan…':'Loading plan…');
+  let pdf;
+  try{
+    const buf=await f.arrayBuffer();
+    pdf=await pdfjsLib.getDocument({data:buf}).promise;
+  }catch(err){ flash(lang==='af'?'Kon nie PDF lees nie.':'Could not read that PDF.'); return; }
+  const n=pdf.numPages;
+  // Page-count guard: many high-res pages can exhaust phone memory / storage.
+  if(n>8){
+    const msg=lang==='af'
+      ? `Hierdie PDF het ${n} bladsye. Baie bladsye kan die foon se geheue/berging oorlaai. Voer alles in? (Wenk: voer eerder net die nodige bladsye in.)`
+      : `This PDF has ${n} pages. Many high-res pages can exhaust phone memory/storage. Import all of them? (Tip: a smaller plan set is safer.)`;
+    if(!confirm(msg)) return;
+  }
+  // snapshot current plans so we can roll back if storage overflows
+  const plansBefore = JSON.parse(JSON.stringify(plans));
+  const added=[];
+  try{
+    for(let pn=1;pn<=n;pn++){
+      flash((lang==='af'?'Verwerk bladsy ':'Rendering page ')+pn+'/'+n+'…');
+      const page=await pdf.getPage(pn);
+      let vp=page.getViewport({scale:1});
+      const maxEdge=1600; const scale=Math.min(2.0, maxEdge/Math.max(vp.width,vp.height));
+      vp=page.getViewport({scale});
+      const cv=document.createElement('canvas'); cv.width=Math.round(vp.width); cv.height=Math.round(vp.height);
+      await page.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;
+      const img=cv.toDataURL('image/jpeg',0.7);
+      const rec={id:pid(), name:((f.name||'Plan').replace(/\.pdf$/i,'')||'Plan')+(n>1?(' p'+pn):''), img, w:cv.width, h:cv.height, rooms:[], zones:[]};
+      plans.push(rec); added.push(rec.id);
+      await new Promise(r=>setTimeout(r,0)); // yield so the UI/browser stays responsive between pages
+    }
+  }catch(err){ flash(lang==='af'?'Kon nie alle bladsye verwerk nie.':'Could not render all pages.'); }
+
+  // Verify it actually persists; if storage is full, roll back so we don't show phantom plans that vanish on reload.
+  saveCurrentToStore();
+  const ok = persistStore();
+  if(!ok){
+    plans = plansBefore;                 // roll back in memory
+    curPlanPage = plans.length?Math.min(curPlanPage,plans.length-1):-1;
+    saveCurrentToStore(); persistStore();
+    renderPlanPanel();
+    flash(lang==='af'
+      ? 'Berging vol — plan nie gestoor nie. Rugsteun & skrap ou inspeksies, of voer minder bladsye in.'
+      : 'Storage full — plan not saved. Back up & delete old inspections, or import fewer pages.');
+    return;
+  }
+  curPlanPage=plans.length-added.length; // jump to first newly added
+  if(curPlanPage<0) curPlanPage=plans.length?0:-1;
+  renderPlanPanel();
+  flash(lang==='af'?`${added.length} bladsy(e) ingevoer.`:`${added.length} page(s) imported.`);
+}
+
+function setPlanMode(m){ planMode=m; document.querySelectorAll('#planModes .pm').forEach(el=>el.dataset.on=(el.dataset.mode===m)?'1':'0'); updatePlanHint(); }
+function updatePlanHint(){ const h=document.getElementById('planHint'); if(!h) return;
+  const hints={ pin:(lang==='af'?'Tik op die plan om \u2019n fout te pen.':'Tap the plan to drop a snag pin.'),
+    room:(lang==='af'?'Tik om \u2019n kamermerker te plaas; tik naam in.':'Tap to place a room marker, then name it.'),
+    zone:(lang==='af'?'Sleep om \u2019n kamerblok te teken.':'Drag to draw a room box.') };
+  h.textContent=hints[planMode]||''; }
+
+function renamePlanPage(){ if(curPlanPage<0) return; const p=plans[curPlanPage];
+  const v=prompt(lang==='af'?'Bladsynaam:':'Page name:',p.name); if(v!=null){ p.name=v.trim()||p.name; touch(); renderPlanPanel(); } }
+function deletePlanPage(){ if(curPlanPage<0) return;
+  if(!confirm(lang==='af'?'Skrap hierdie planbladsy? Penne hierop word ontkoppel.':'Delete this plan page? Pins on it will be unlinked.')) return;
+  const gone=plans[curPlanPage].id;
+  items.forEach(it=>{ if(it.planRef&&it.planRef.planId===gone) it.planRef=null; });
+  plans.splice(curPlanPage,1); curPlanPage=plans.length?Math.min(curPlanPage,plans.length-1):-1; touch(); renderPlanPanel(); render(); }
+
+function showPlanPage(i){ curPlanPage=i; renderPlanPanel(); }
+
+/* plan view transform state */
+let planScale=1, planTx=0, planTy=0, planBaseW=0, planBaseH=0;
+function applyPlanTransform(){ const wrap=document.getElementById('planZoomWrap'); if(!wrap) return;
+  wrap.style.transform=`translate(${planTx}px,${planTy}px) scale(${planScale})`;
+  const lbl=document.getElementById('planZoomLbl'); if(lbl) lbl.textContent=Math.round(planScale*100)+'%'; }
+function clampPan(){ const stage=document.getElementById('planStage'); if(!stage) return;
+  const sw=stage.clientWidth, sh=stage.clientHeight;
+  const cw=planBaseW*planScale, ch=planBaseH*planScale;
+  // keep image from drifting fully out of view
+  const minTx=Math.min(0, sw-cw), minTy=Math.min(0, sh-ch);
+  planTx=Math.max(minTx, Math.min(0, planTx)); if(cw<sw) planTx=(sw-cw)/2;
+  planTy=Math.max(minTy, Math.min(0, planTy)); if(ch<sh) planTy=(sh-ch)/2; }
+function fitPlan(){ const stage=document.getElementById('planStage'); const p=plans[curPlanPage]; if(!stage||!p) return;
+  const sw=stage.clientWidth, sh=stage.clientHeight;
+  // base size = canvas displayed at natural fit (contain) at scale 1
+  const fit=Math.min(sw/p.w, sh/p.h);
+  planBaseW=p.w*fit; planBaseH=p.h*fit;
+  const wrap=document.getElementById('planZoomWrap'), cv=document.getElementById('planCanvas'), ov=document.getElementById('planOverlay');
+  wrap.style.width=planBaseW+'px'; wrap.style.height=planBaseH+'px';
+  cv.style.width=planBaseW+'px'; cv.style.height=planBaseH+'px';
+  ov.style.width=planBaseW+'px'; ov.style.height=planBaseH+'px';
+  planScale=1; planTx=(sw-planBaseW)/2; planTy=(sh-planBaseH)/2; applyPlanTransform(); }
+function planZoom(dir){ const stage=document.getElementById('planStage'); if(!stage) return;
+  const sw=stage.clientWidth, sh=stage.clientHeight; const cx=sw/2, cy=sh/2;
+  const old=planScale; planScale=Math.max(1, Math.min(6, planScale*(dir>0?1.4:1/1.4)));
+  // zoom about centre of view
+  planTx=cx-(cx-planTx)*(planScale/old); planTy=cy-(cy-planTy)*(planScale/old);
+  clampPan(); applyPlanTransform(); }
+function planZoomReset(){ fitPlan(); }
+
+function renderPlanPanel(){
+  const empty=document.getElementById('planEmpty'), body=document.getElementById('planBody');
+  if(!empty||!body) return;
+  if(!plans.length){ empty.style.display='block'; body.style.display='none'; return; }
+  empty.style.display='none'; body.style.display='block';
+  if(curPlanPage<0||curPlanPage>=plans.length) curPlanPage=0;
+  const sel=document.getElementById('planPageSel'); sel.innerHTML='';
+  plans.forEach((p,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=p.name||('Plan '+(i+1)); if(i===curPlanPage)o.selected=true; sel.appendChild(o); });
+  const p=plans[curPlanPage];
+  const cv=document.getElementById('planCanvas'); const ctx=cv.getContext('2d');
+  const img=new Image();
+  img.onload=()=>{ cv.width=p.w||img.width; cv.height=p.h||img.height; ctx.drawImage(img,0,0,cv.width,cv.height); fitPlan(); drawPlanOverlay(); };
+  img.src=p.img;
+  updatePlanHint(); renderRoomList();
+}
+
+function drawPlanOverlay(){
+  const p=plans[curPlanPage]; const ov=document.getElementById('planOverlay'); if(!ov||!p) return;
+  ov.innerHTML='';
+  (p.zones||[]).forEach(z=>{ const b=document.createElement('div'); b.className='roombox';
+    b.style.left=(z.fx*100)+'%'; b.style.top=(z.fy*100)+'%'; b.style.width=(z.fw*100)+'%'; b.style.height=(z.fh*100)+'%';
+    b.innerHTML=`<span>${escHtml(z.name||'room')}</span>`; ov.appendChild(b); });
+  (p.rooms||[]).forEach(r=>{ const m=document.createElement('div'); m.className='roommark';
+    m.style.left=(r.fx*100)+'%'; m.style.top=(r.fy*100)+'%'; m.textContent=r.name||'room'; ov.appendChild(m); });
+  items.filter(it=>it.planRef&&it.planRef.planId===p.id).forEach(it=>{
+    const pin=document.createElement('div'); pin.className='pin';
+    pin.style.left=(it.planRef.fx*100)+'%'; pin.style.top=(it.planRef.fy*100)+'%';
+    const col=it.status==='defect'?'#ef4444':it.status==='incomplete'?'#f59e0b':it.status==='complete'?'#22c55e':'#ff7a18';
+    pin.innerHTML=`<svg viewBox="0 0 26 34"><path d="M13 0C6 0 0 5.5 0 12.5 0 22 13 34 13 34s13-12 13-21.5C26 5.5 20 0 13 0z" fill="${col}"/></svg><span>${String(it.snag).padStart(2,'0')}</span>`;
+    pin.title='SNAG '+String(it.snag).padStart(3,'0')+(it.loc?' — '+it.loc:'');
+    ov.appendChild(pin);
+  });
+}
+
+// Map a screen point to plan fraction (0..1), accounting for pan+zoom transform.
+function planRelFraction(clientX, clientY){
+  const stage=document.getElementById('planStage'); const r=stage.getBoundingClientRect();
+  const sx=clientX-r.left, sy=clientY-r.top;            // point within stage
+  const lx=(sx-planTx)/planScale, ly=(sy-planTy)/planScale; // undo transform -> wrap-local px
+  return { fx:Math.min(1,Math.max(0,lx/planBaseW)), fy:Math.min(1,Math.max(0,ly/planBaseH)) };
+}
+
+function nearestRoom(p,fx,fy){ let best=null,bd=1e9;
+  (p.rooms||[]).forEach(r=>{ const d=(r.fx-fx)**2+(r.fy-fy)**2; if(d<bd){bd=d;best=r.name;} });
+  (p.zones||[]).forEach(z=>{ if(fx>=z.fx&&fx<=z.fx+z.fw&&fy>=z.fy&&fy<=z.fy+z.fh){ best=z.name; bd=-1; } });
+  return best; }
+
+function placePin(fx,fy){ const p=plans[curPlanPage]; if(!p) return;
+  if(planMode==='room'){ const name=prompt(lang==='af'?'Kamernaam:':'Room name:',''); if(name==null||!name.trim()) return;
+    p.rooms.push({name:name.trim(),fx,fy}); touch(); drawPlanOverlay(); renderRoomList(); return; }
+  // pin mode
+  seq++; const room=nearestRoom(p,fx,fy)||'';
+  const it={id:uid(),snag:seq,loc:room,room,status:'',trade:'',priority:'',notes:'',photos:[],audio:null,gps:null,ts:nowStamp(),history:[],planRef:{planId:p.id,fx,fy}};
+  items.push(it); touch(); drawPlanOverlay(); render();
+  flash((lang==='af'?'Fout gepen: SNAG ':'Pinned SNAG ')+String(seq).padStart(3,'0')+(room?(' ('+room+')'):'')); }
+
+/* ---- unified pointer/touch handling: tap=place, drag=pan, pinch=zoom, zone-mode drag=box ---- */
+let ptrDown=false, ptrMoved=false, ptrStartX=0, ptrStartY=0, panStartTx=0, panStartTy=0;
+let pinchD0=0, pinchS0=1, zoneStartF=null;
+function dist(t1,t2){ return Math.hypot(t1.clientX-t2.clientX, t1.clientY-t2.clientY); }
+
+function planPointerDown(ev){
+  if(curPlanPage<0) return; ev.preventDefault();
+  if(ev.touches&&ev.touches.length===2){ pinchD0=dist(ev.touches[0],ev.touches[1]); pinchS0=planScale; ptrDown=false; return; }
+  const t=(ev.touches&&ev.touches[0])||ev;
+  ptrDown=true; ptrMoved=false; ptrStartX=t.clientX; ptrStartY=t.clientY; panStartTx=planTx; panStartTy=planTy;
+  if(planMode==='zone'){ zoneStartF=planRelFraction(t.clientX,t.clientY); }
+}
+function planPointerMove(ev){
+  if(curPlanPage<0) return;
+  if(ev.touches&&ev.touches.length===2){ ev.preventDefault();
+    const d=dist(ev.touches[0],ev.touches[1]); if(pinchD0>0){
+      const stage=document.getElementById('planStage'); const r=stage.getBoundingClientRect();
+      const mx=(ev.touches[0].clientX+ev.touches[1].clientX)/2-r.left, my=(ev.touches[0].clientY+ev.touches[1].clientY)/2-r.top;
+      const old=planScale; planScale=Math.max(1,Math.min(6, pinchS0*(d/pinchD0)));
+      planTx=mx-(mx-planTx)*(planScale/old); planTy=my-(my-planTy)*(planScale/old);
+      clampPan(); applyPlanTransform(); }
+    return; }
+  if(!ptrDown) return;
+  const t=(ev.touches&&ev.touches[0])||ev;
+  const dx=t.clientX-ptrStartX, dy=t.clientY-ptrStartY;
+  if(Math.abs(dx)>6||Math.abs(dy)>6) ptrMoved=true;
+  if(planMode==='zone' && zoneStartF){ ev.preventDefault();
+    const c=planRelFraction(t.clientX,t.clientY);
+    zoneDraft={fx:Math.min(zoneStartF.fx,c.fx),fy:Math.min(zoneStartF.fy,c.fy),fw:Math.abs(c.fx-zoneStartF.fx),fh:Math.abs(c.fy-zoneStartF.fy)};
+    drawPlanOverlay(); const ov=document.getElementById('planOverlay'); const b=document.createElement('div'); b.className='roombox';
+    b.style.left=(zoneDraft.fx*100)+'%'; b.style.top=(zoneDraft.fy*100)+'%'; b.style.width=(zoneDraft.fw*100)+'%'; b.style.height=(zoneDraft.fh*100)+'%'; ov.appendChild(b);
+    return; }
+  // pan (pin/room modes): drag moves the view
+  if(ptrMoved){ ev.preventDefault(); planTx=panStartTx+dx; planTy=panStartTy+dy; clampPan(); applyPlanTransform(); }
+}
+function planPointerUp(ev){
+  if(curPlanPage<0) return;
+  if(ev.touches&&ev.touches.length>=1){ pinchD0=0; }   // a finger lifted from pinch
+  if(planMode==='zone' && zoneStartF){
+    const p=plans[curPlanPage];
+    if(zoneDraft&&zoneDraft.fw>0.02&&zoneDraft.fh>0.02){ const name=prompt(lang==='af'?'Kamernaam:':'Room name:',''); if(name&&name.trim()){ p.zones.push(Object.assign({name:name.trim()},zoneDraft)); touch(); } }
+    zoneStartF=null; zoneDraft=null; drawPlanOverlay(); renderRoomList(); ptrDown=false; return;
+  }
+  if(ptrDown && !ptrMoved){
+    // genuine tap -> place pin/room at that point, or jump to a pin if one is tapped
+    const t=(ev.changedTouches&&ev.changedTouches[0])||ev;
+    const {fx,fy}=planRelFraction(t.clientX,t.clientY);
+    // if tapping near an existing pin, jump to it instead of creating
+    const p=plans[curPlanPage];
+    const hit=items.find(it=>it.planRef&&it.planRef.planId===p.id && Math.hypot(it.planRef.fx-fx,it.planRef.fy-fy)<0.025);
+    if(hit){ const el=document.getElementById('notes_'+hit.id); if(el) el.scrollIntoView({behavior:'smooth',block:'center'}); flash('SNAG '+String(hit.snag).padStart(3,'0')); }
+    else placePin(fx,fy);
+  }
+  ptrDown=false; ptrMoved=false;
+}
+
+function renderRoomList(){ const el=document.getElementById('roomList'); if(!el||curPlanPage<0){ if(el) el.innerHTML=''; return; }
+  const p=plans[curPlanPage]; const all=[...(p.rooms||[]).map((r,i)=>({k:'rooms',i,name:r.name})),...(p.zones||[]).map((z,i)=>({k:'zones',i,name:z.name}))];
+  el.innerHTML=all.map(r=>`<span class="roomtag">${escHtml(r.name)} <button onclick="delRoom('${r.k}',${r.i})">✕</button></span>`).join(''); }
+function delRoom(kind,i){ const p=plans[curPlanPage]; if(!p) return; p[kind].splice(i,1); touch(); drawPlanOverlay(); renderRoomList(); }
+function planNameById(pid){ const p=plans.find(x=>x.id===pid); return p?(p.name||'Plan'):'(deleted plan)'; }
 
 /* ================= photos ================= */
 function pickPhoto(id,capture){ const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.multiple=true; if(capture) inp.capture='environment';
@@ -400,7 +707,7 @@ function delPhoto(id,idx){ const it=items.find(i=>i.id===id); if(!it) return; it
 /* ================= logo ================= */
 function pickLogo(){ const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.onchange=e=>{ const f=e.target.files[0]; if(!f) return; compress(f,400,0.85,d=>{ logoData=d; renderLogo(); touch(); }); }; inp.click(); }
 function clearLogo(){ logoData=null; renderLogo(); touch(); }
-function renderLogo(){ const p=document.getElementById('logo_prev'); p.innerHTML=logoData?`<img src="${logoData}">`:T('logo')?'':''; if(!logoData) p.textContent='No logo'; }
+function renderLogo(){ const p=document.getElementById('logo_prev'); if(logoData){ p.innerHTML=`<img src="${logoData}">`; } else { p.textContent='No logo'; } }
 
 /* ================= audio memo ================= */
 let mediaRec=null, audioChunks=[], audioRecId=null;
@@ -509,6 +816,10 @@ function itemCard(it){
     </div>
     <div class="item-body">
       <div class="field"><label>${T('loc')}</label><input value="${escAttr(it.loc)}" oninput="bind(${js(it.id)},'loc',this)" placeholder="e.g. Plant room, Roof level AHU-2"></div>
+      <div class="grid2">
+        <div class="field"><label>${T('room')}</label><input value="${escAttr(it.room||'')}" oninput="bind(${js(it.id)},'room',this)" placeholder="${T('room')}"></div>
+        <div class="field"><label>${T('planlink')}</label><div style="font-size:11px;color:${it.planRef?'var(--ok)':'var(--na)'};padding:11px 0;">${it.planRef?('📍 '+planNameById(it.planRef.planId)):T('nolink')}</div></div>
+      </div>
       <div class="grid2">
         <div class="field"><label>${T('trade')}</label><select onchange="bind(${js(it.id)},'trade',this)">${tradeOpts}</select></div>
         <div class="field"><label>${T('priority')}</label><select onchange="bind(${js(it.id)},'priority',this)">${prioOpts}</select></div>
@@ -646,6 +957,38 @@ async function exportPDF(){
       if(col===1) y+=rowH+gap; }
     y+=2; line(y,true); y+=7;
   }
+
+  // ---- plan pages with pins ----
+  for(const pl of plans){
+    const pinned=items.filter(it=>it.planRef&&it.planRef.planId===pl.id);
+    doc.addPage(); y=M;
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20);
+    doc.text((lang==='af'?'Plan: ':'Plan: ')+(pl.name||'Plan'),M,y); y+=6;
+    // fit plan image into content width, leave room for legend
+    const availW=W-2*M, availH=H-y-M-8;
+    let dw=availW, dh=dw*(pl.h/pl.w);
+    if(dh>availH){ dh=availH; dw=dh*(pl.w/pl.h); }
+    const ox=M+(availW-dw)/2, oy=y;
+    try{ doc.addImage(pl.img,'JPEG',ox,oy,dw,dh); }catch(e){}
+    doc.setDrawColor(200); doc.rect(ox,oy,dw,dh);
+    // zones
+    (pl.zones||[]).forEach(z=>{ doc.setDrawColor(34,197,94); doc.setLineWidth(0.4);
+      doc.rect(ox+z.fx*dw, oy+z.fy*dh, z.fw*dw, z.fh*dh); });
+    // room markers
+    doc.setFontSize(7);
+    (pl.rooms||[]).forEach(r=>{ doc.setTextColor(20,120,60); doc.text(r.name||'room', ox+r.fx*dw, oy+r.fy*dh, {align:'center'}); });
+    // pins
+    pinned.forEach(it=>{ const px=ox+it.planRef.fx*dw, py=oy+it.planRef.fy*dh;
+      const col=it.status==='defect'?[239,68,68]:it.status==='incomplete'?[245,158,11]:it.status==='complete'?[34,197,94]:[255,122,24];
+      doc.setFillColor(col[0],col[1],col[2]); doc.circle(px,py,3.2,'F');
+      doc.setTextColor(255); doc.setFont('helvetica','bold'); doc.setFontSize(6);
+      doc.text(String(it.snag).padStart(2,'0'),px,py+1.2,{align:'center'}); });
+    y=oy+dh+6;
+    if(pinned.length){ doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(90);
+      const legend=pinned.sort((a,b)=>a.snag-b.snag).map(it=>`${String(it.snag).padStart(3,'0')}: ${it.room||it.loc||'—'}`).join('    ');
+      doc.splitTextToSize(legend,W-2*M).forEach(l=>{ ck(5); doc.text(l,M,y); y+=4; }); }
+  }
+
   if(m.inspector){ ck(34); doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20); doc.text(T('pdf_signoff'),M,y); y+=10;
     doc.setDrawColor(120); doc.setLineWidth(0.3); doc.line(M,y,M+70,y); doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(60);
     doc.text(lang==='af'?'Inspekteur (handtekening)':'Inspector (signature)',M,y+5); doc.text(`${lang==='af'?'Naam':'Name'}:  ${m.inspector}`,M,y+12); doc.text(`${lang==='af'?'Datum':'Date'}:  ${m.date||''}`,M,y+18); }
@@ -660,7 +1003,22 @@ function imgDim(src){return new Promise(res=>{const i=new Image();i.onload=()=>r
 window.addEventListener('load',()=>{ const cv=document.getElementById('acanvas');
   ['mousedown','touchstart'].forEach(e=>cv.addEventListener(e,startDraw,{passive:false}));
   ['mousemove','touchmove'].forEach(e=>cv.addEventListener(e,moveDraw,{passive:false}));
-  ['mouseup','mouseleave','touchend','touchcancel'].forEach(e=>cv.addEventListener(e,endDraw)); });
+  ['mouseup','mouseleave','touchend','touchcancel'].forEach(e=>cv.addEventListener(e,endDraw));
+  // plan stage: unified pointer handling (tap=place, drag=pan, pinch=zoom, zone-mode=box)
+  const stage=document.getElementById('planStage');
+  if(stage){
+    stage.addEventListener('touchstart',planPointerDown,{passive:false});
+    stage.addEventListener('mousedown',planPointerDown,{passive:false});
+    stage.addEventListener('touchmove',planPointerMove,{passive:false});
+    stage.addEventListener('mousemove',planPointerMove,{passive:false});
+    stage.addEventListener('touchend',planPointerUp,{passive:false});
+    stage.addEventListener('touchcancel',planPointerUp,{passive:false});
+    stage.addEventListener('mouseup',planPointerUp);
+    stage.addEventListener('mouseleave',e=>{ if(ptrDown) planPointerUp(e); });
+    // desktop wheel zoom
+    stage.addEventListener('wheel',e=>{ if(curPlanPage<0) return; e.preventDefault(); planZoom(e.deltaY<0?1:-1); },{passive:false});
+  }
+});
 window.addEventListener('beforeunload',()=>{ saveCurrentToStore(); persistStore(); });
 
 /* ================= init ================= */
