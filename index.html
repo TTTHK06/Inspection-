@@ -9,10 +9,12 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Snag List">
 <meta name="theme-color" content="#0f1115">
+<link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Crect width='180' height='180' fill='%230f1115'/%3E%3Crect x='30' y='30' width='120' height='120' rx='16' fill='none' stroke='%23ff7a18' stroke-width='10'/%3E%3Cpath d='M60 92l22 22 40-50' fill='none' stroke='%23facc15' stroke-width='12' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>if(window.pdfjsLib){ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; }</script>
+<script>if('serviceWorker' in navigator){ window.addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); }); }</script>
 <style>
   :root{
     --bg:#0f1115; --panel:#171a21; --panel2:#1d212b; --line:#2a2f3a;
@@ -879,7 +881,18 @@ function shootCam(){ const v=document.getElementById('camVideo'); if(!v||!v.vide
   const c=document.createElement('canvas'); c.width=w; c.height=h; c.getContext('2d').drawImage(v,0,0,w,h);
   const data=c.toDataURL('image/jpeg',0.72);
   const it=items.find(i=>i.id===camTargetId); if(it){ it.photos.push(data); touch(); render(); }
-  flash(lang==='af'?'Foto gestoor — neem nog, of Sluit.':'Photo captured — take more, or Close.');
+  savePhotoToDevice(data, it);   // also keep a copy in the phone's Downloads/gallery
+  flash(lang==='af'?'Foto gestoor (ook op foon).':'Photo saved (also to phone).');
+}
+// Save a captured photo to the device (Downloads → visible in the gallery). In-app camera
+// frames only live in the app otherwise; gallery picks & the OS-camera fallback already save themselves.
+function savePhotoToDevice(dataURL, it){
+  try{
+    const m=meta(); const stamp=nowStamp().replace(/[: ]/g,'-');
+    const name=`Snag-${(m.no||'inspection').replace(/[^\w-]/g,'')}-${String((it&&it.snag)||0).padStart(3,'0')}-${stamp}.jpg`;
+    const a=document.createElement('a'); a.href=dataURL; a.download=name;
+    document.body.appendChild(a); a.click(); setTimeout(()=>{ try{ a.remove(); }catch(e){} },0);
+  }catch(e){}
 }
 
 /* ================= logo ================= */
