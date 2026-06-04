@@ -271,6 +271,7 @@
 
   <section class="panel">
     <h2 id="t_proj_h">Project Details</h2>
+    <div style="margin-bottom:12px;"><button class="pbtn" onclick="openProjects()" id="t_projbtn">📁 Select / manage projects</button></div>
     <div class="grid2">
       <div class="field"><label id="t_pname">Project Name</label><input id="p_name" oninput="touch();syncSel()" placeholder="e.g. Substation Building B"></div>
       <div class="field"><label id="t_pno">Project No.</label><input id="p_no" oninput="touch();syncSel()" placeholder="e.g. M5438"></div>
@@ -365,6 +366,20 @@
   </div>
 </div>
 
+<!-- project library: select / manage projects (auto-fills Project Details) -->
+<div class="modal" id="proj">
+  <div class="phr-card">
+    <h2 class="phr-h" id="t_proj_modal_h">Projects</h2>
+    <div id="projList" class="roomlist"></div>
+    <div class="phr-add" style="flex-wrap:wrap;">
+      <button onclick="saveCurrentProject()" id="t_proj_save">＋ Save current</button>
+      <button onclick="importProjectsCSV()" id="t_proj_import">Import CSV</button>
+      <button onclick="exportProjectsCSV()" id="t_proj_export">Export CSV</button>
+    </div>
+    <button onclick="closeProjects()" id="t_proj_close" class="phr-close">Close</button>
+  </div>
+</div>
+
 <!-- reusable phrase library (Rapid Text) -->
 <div class="modal" id="phr">
   <div class="phr-card">
@@ -405,6 +420,7 @@ const I18N={
     rpt_included:'In report — tap to exclude',rpt_excluded:'Excluded — tap to include',rpt_tag:'✕ not in report',
     rs_h:'Report sections',rs_hint:'Toggle which sections appear in the PDF / Word report.',
     rs_summary:'Summary',rs_plans:'Plan pages',rs_photos:'Photos',rs_history:'History',
+    projbtn:'📁 Select / manage projects',proj_modal_h:'Projects',proj_save:'＋ Save current',proj_import:'Import CSV',proj_export:'Export CSV',proj_close:'Close',
     markup:'Mark up',capgps:'Capture GPS',update:'Update',logged:'Logged',
     recmemo:'Record memo',stopmemo:'Stop',autosave:'Auto-saving to this browser. Backup regularly.',
     dupitem:'Duplicate item',reinspect:'Re-inspect',
@@ -437,6 +453,7 @@ const I18N={
     rpt_included:'In verslag — tik om uit te sluit',rpt_excluded:'Uitgesluit — tik om in te sluit',rpt_tag:'✕ nie in verslag',
     rs_h:'Verslag-afdelings',rs_hint:'Kies watter afdelings in die PDF / Word-verslag verskyn.',
     rs_summary:'Opsomming',rs_plans:'Planbladsye',rs_photos:'Foto’s',rs_history:'Geskiedenis',
+    projbtn:'📁 Kies / bestuur projekte',proj_modal_h:'Projekte',proj_save:'＋ Stoor huidige',proj_import:'Voer CSV in',proj_export:'Voer CSV uit',proj_close:'Sluit',
     markup:'Merk',capgps:'Kry GPS',update:'Werk by',logged:'Gelog',
     recmemo:'Neem memo op',stopmemo:'Stop',autosave:'Outomaties gestoor in hierdie blaaier. Rugsteun gereeld.',
     dupitem:'Dupliseer item',reinspect:'Herinspeksie',
@@ -470,6 +487,7 @@ function applyLang(){
   set('t_insp','insp');set('t_date','date');set('t_weather','weather');
   { const ai=document.getElementById('t_additem'); if(ai) ai.textContent=T(isSurvey()?'additem_survey':'additem'); }
   set('t_rs_h','rs_h');set('t_rs_hint','rs_hint');
+  set('t_projbtn','projbtn');set('t_proj_modal_h','proj_modal_h');set('t_proj_save','proj_save');set('t_proj_import','proj_import');set('t_proj_export','proj_export');set('t_proj_close','proj_close');
   set('t_backup','backup');set('t_restore','restore');set('t_csv','csv');set('t_pdf','pdf');
   set('t_new','new');set('t_dup','dup');set('t_delinsp','delinsp');
   const ri=document.getElementById('t_reinspect'); if(ri) ri.textContent=T('reinspect');
@@ -1094,6 +1112,49 @@ function insertPhrase(i){ const text=phrases[i]; if(text==null||!phraseTarget) r
   it[phraseTarget.key]=(cur+sep+text); touch(); closePhrases(); render(); }
 function addPhrase(){ const inp=document.getElementById('phraseNew'); const v=(inp&&inp.value||'').trim(); if(!v) return; phrases.push(v); savePhrases(); inp.value=''; renderPhraseModal(); }
 function delPhrase(i){ phrases.splice(i,1); savePhrases(); renderPhraseModal(); }
+
+/* ================= project library (select / manage projects) ================= */
+const PROJECTS_KEY='snag_projects';
+let projects=(()=>{ try{ const r=localStorage.getItem(PROJECTS_KEY); if(r){ const a=JSON.parse(r); if(Array.isArray(a)) return a; } }catch(e){} return []; })();
+function saveProjects(){ try{ localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects)); }catch(e){} }
+function projLabel(p){ return (p.no?p.no+' — ':'')+(p.name||'(unnamed)'); }
+function openProjects(){ renderProjectModal(); document.getElementById('proj').classList.add('on'); }
+function closeProjects(){ const m=document.getElementById('proj'); if(m) m.classList.remove('on'); }
+function renderProjectModal(){ const el=document.getElementById('projList'); if(!el) return;
+  if(!projects.length){ el.innerHTML=`<div style="color:var(--muted);font-size:12px">${lang==='af'?'Geen projekte gestoor nie. Stoor die huidige, of voer ’n CSV in.':'No projects saved yet. Save the current one, or import a CSV.'}</div>`; return; }
+  el.innerHTML=projects.map((p,i)=>`<span class="roomtag"><span class="ptxt" onclick="applyProject(${i})">${escHtml(projLabel(p))}</span> <button onclick="delProject(${i})" title="delete">✕</button></span>`).join(''); }
+function applyProject(i){ const p=projects[i]; if(!p) return;
+  setVal('p_no',p.no||''); setVal('p_name',p.name||''); setVal('p_client',p.client||''); setVal('p_addr',p.addr||'');
+  syncSel(); touch(); closeProjects(); flash((lang==='af'?'Projek gekies: ':'Project selected: ')+projLabel(p)); }
+function saveCurrentProject(){ const p={no:val('p_no').trim(),name:val('p_name').trim(),client:val('p_client').trim(),addr:val('p_addr').trim()};
+  if(!p.no&&!p.name){ flash(lang==='af'?'Vul eers projeknaam/-nommer in.':'Enter a project name/number first.'); return; }
+  const idx=projects.findIndex(x=>(x.no&&x.no===p.no)||(!x.no&&!p.no&&x.name===p.name));
+  if(idx>=0) projects[idx]=p; else projects.push(p);
+  saveProjects(); renderProjectModal(); flash(lang==='af'?'Projek gestoor.':'Project saved.'); }
+function delProject(i){ projects.splice(i,1); saveProjects(); renderProjectModal(); }
+function parseCSV(text){ const rows=[]; let row=[],cur='',q=false;
+  for(let i=0;i<text.length;i++){ const ch=text[i];
+    if(q){ if(ch==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=ch; }
+    else if(ch==='"') q=true; else if(ch===','){ row.push(cur); cur=''; }
+    else if(ch==='\n'){ row.push(cur); rows.push(row); row=[]; cur=''; } else if(ch==='\r'){} else cur+=ch; }
+  if(cur!==''||row.length){ row.push(cur); rows.push(row); } return rows; }
+function importProjectsCSV(){ const inp=document.createElement('input'); inp.type='file'; inp.accept='.csv,text/csv';
+  inp.onchange=e=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader();
+    r.onload=ev=>{ try{ const rows=parseCSV(String(ev.target.result||'')).filter(rw=>rw.some(c=>c&&c.trim())); if(!rows.length){ flash('Empty CSV.'); return; }
+      const h=rows[0].map(c=>(c||'').toLowerCase()); const looksHeader=h.some(c=>/name|project|client|addr|site|number|nommer/.test(c));
+      let iNo=0,iName=1,iClient=2,iAddr=3, start=0;
+      if(looksHeader){ start=1; const find=(re,d)=>{ const k=h.findIndex(c=>re.test(c)); return k>=0?k:d; };
+        iNo=find(/\bno\b|number|nommer|nr/,0); iName=find(/name|naam|project|projek/,1); iClient=find(/client|kli/,2); iAddr=find(/addr|site|adres|ligging/,3); }
+      let added=0; for(let i=start;i<rows.length;i++){ const rw=rows[i]; const p={no:(rw[iNo]||'').trim(),name:(rw[iName]||'').trim(),client:(rw[iClient]||'').trim(),addr:(rw[iAddr]||'').trim()};
+        if(!p.no&&!p.name) continue; const ex=projects.findIndex(x=>(x.no&&x.no===p.no)||(!x.no&&!p.no&&x.name===p.name)); if(ex>=0) projects[ex]=p; else projects.push(p); added++; }
+      saveProjects(); renderProjectModal(); flash((lang==='af'?'Projekte ingevoer: ':'Projects imported: ')+added);
+    }catch(err){ flash(lang==='af'?'Kon nie CSV lees nie.':'Could not read that CSV.'); } }; r.readAsText(f); };
+  openPicker(inp); }
+function exportProjectsCSV(){ if(!projects.length){ flash(lang==='af'?'Geen projekte om uit te voer nie.':'No projects to export.'); return; }
+  const head=['Project No','Name','Client','Site Address'];
+  const lines=[head].concat(projects.map(p=>[p.no||'',p.name||'',p.client||'',p.addr||''])).map(r=>r.map(csvCell).join(',')).join('\r\n');
+  const blob=new Blob(['﻿'+lines],{type:'text/csv;charset=utf-8'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='projects.csv'; document.body.appendChild(a); a.click(); setTimeout(()=>{ try{ URL.revokeObjectURL(a.href); a.remove(); }catch(e){} },0); flash(lang==='af'?'Projekte uitgevoer.':'Projects exported.'); }
 
 /* ================= logo ================= */
 function pickLogo(){ const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.onchange=e=>{ const f=e.target.files[0]; if(!f) return; compress(f,400,0.85,d=>{ logoData=d; renderLogo(); touch(); }); }; openPicker(inp); }
