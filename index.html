@@ -850,15 +850,22 @@ function delPhoto(id,idx){ const it=items.find(i=>i.id===id); if(!it) return; it
 let camStream=null, camFacing='environment', camTargetId=null;
 async function openCamera(id){
   camTargetId=id;
+  if(!window.isSecureContext){ flash(lang==='af'?'Kamera benodig https.':'Camera needs an https page.'); pickPhoto(id,true); return; }
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ pickPhoto(id,true); return; } // old browsers → OS picker
   try{
-    camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:camFacing}},audio:false});
+    try{ camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:camFacing}},audio:false}); }
+    catch(e1){ camStream=await navigator.mediaDevices.getUserMedia({video:true,audio:false}); } // retry with any camera (handles OverconstrainedError)
     const v=document.getElementById('camVideo'); v.srcObject=camStream;
     document.getElementById('cam').classList.add('on');
   }catch(e){
-    // permission denied / no camera / not secure context → fall back to the OS file+camera picker
-    flash(lang==='af'?'Kamera nie beskikbaar — gebruik kieser.':'Camera unavailable — using picker.');
-    pickPhoto(id,true);
+    const r=(e&&e.name)||'error';
+    let msg;
+    if(r==='NotAllowedError'||r==='SecurityError') msg=lang==='af'?'Kameratoestemming geweier — laat kamera toe in blaaier-instellings, herlaai.':'Camera blocked — allow Camera in browser site settings, then reload.';
+    else if(r==='NotFoundError'||r==='OverconstrainedError') msg=lang==='af'?'Geen kamera gevind nie.':'No camera found on this device.';
+    else if(r==='NotReadableError') msg=lang==='af'?'Kamera in gebruik deur ’n ander app — maak dit toe.':'Camera busy — close other camera apps.';
+    else msg=(lang==='af'?'Kamera fout: ':'Camera error: ')+r;
+    flash(msg);
+    pickPhoto(id,true); // last resort: OS file/camera picker
   }
 }
 function stopCam(){ if(camStream){ try{ camStream.getTracks().forEach(t=>t.stop()); }catch(e){} camStream=null; } }
