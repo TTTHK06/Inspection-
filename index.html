@@ -157,6 +157,14 @@
   .modal-canvas-wrap{flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden;}
   .modal canvas{max-width:100%; max-height:100%; touch-action:none; border:1px solid var(--line); border-radius:8px;}
   .modal video{max-width:100%; max-height:100%; border:1px solid var(--line); border-radius:8px; background:#000;}
+  .phr-card{margin:auto; max-width:560px; width:100%; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px; max-height:82vh; overflow:auto;}
+  .phr-h{font-size:11px; letter-spacing:1.5px; text-transform:uppercase; color:var(--accent2); margin:0 0 12px;}
+  .phr-add{display:flex; gap:8px; margin-top:14px;}
+  .phr-add input{flex:1;}
+  .phr-add button,.phr-close{border:1px solid var(--line); background:var(--panel2); color:var(--ink); border-radius:8px; padding:11px 14px; font:inherit; font-size:13px; cursor:pointer;}
+  .phr-close{margin-top:12px; width:100%;}
+  #phraseList .roomtag{cursor:default; color:var(--ink); max-width:100%;}
+  #phraseList .roomtag .ptxt{cursor:pointer; color:var(--ink);}
   .modal-tools{display:flex; gap:8px; padding:12px 0; flex-wrap:wrap; justify-content:center;}
   .modal-tools button{border:1px solid var(--line); background:var(--panel); color:var(--ink); border-radius:8px; padding:11px 14px; font:inherit; font-size:12px; cursor:pointer; text-transform:uppercase; letter-spacing:.5px;}
   .modal-tools button.prim{background:var(--accent); color:#1a1209; border-color:var(--accent);}
@@ -297,6 +305,7 @@
     <button class="btn btn-sec" onclick="exportJSON()" id="t_backup">Backup</button>
     <button class="btn btn-sec" onclick="importJSON()" id="t_restore">Restore</button>
     <button class="btn btn-sec" onclick="exportCSV()" id="t_csv">CSV</button>
+    <button class="btn btn-sec" onclick="exportDOC()" id="t_word">Word</button>
     <button class="btn btn-pdf" onclick="exportPDF()" id="t_pdf">PDF</button>
   </div>
   <div class="hint" id="hint">Auto-saving to this browser. Backup regularly.</div>
@@ -314,6 +323,19 @@
     <button onclick="undoAnnot()">Undo</button>
     <button onclick="closeAnnot(false)">Cancel</button>
     <button class="prim" onclick="closeAnnot(true)">Save</button>
+  </div>
+</div>
+
+<!-- reusable phrase library (Rapid Text) -->
+<div class="modal" id="phr">
+  <div class="phr-card">
+    <h2 class="phr-h" id="t_phrases">Phrases</h2>
+    <div id="phraseList" class="roomlist"></div>
+    <div class="phr-add">
+      <input id="phraseNew" placeholder="Add a phrase…">
+      <button onclick="addPhrase()" id="t_phradd">Add</button>
+    </div>
+    <button onclick="closePhrases()" id="t_phrclose" class="phr-close">Close</button>
   </div>
 </div>
 
@@ -340,6 +362,7 @@ const I18N={
     loc:'Location / Area',trade:'Trade / Discipline',priority:'Priority',notes:'Notes',
     dictate:'Dictate',stop:'Stop',photos:'Photos',camera:'Camera',gallery:'Gallery',
     cam_flip:'Flip',cam_shoot:'Capture',cam_close:'Close',
+    word:'Word',phrases:'Phrases',phradd:'Add',phrclose:'Close',phrnew:'Add a phrase…',
     markup:'Mark up',capgps:'Capture GPS',update:'Update',logged:'Logged',
     recmemo:'Record memo',stopmemo:'Stop',autosave:'Auto-saving to this browser. Backup regularly.',
     dupitem:'Duplicate item',reinspect:'Re-inspect',
@@ -367,6 +390,7 @@ const I18N={
     loc:'Ligging / Area',trade:'Vakgebied',priority:'Prioriteit',notes:'Notas',
     dictate:'Dikteer',stop:'Stop',photos:'Foto\u2019s',camera:'Kamera',gallery:'Galery',
     cam_flip:'Wissel',cam_shoot:'Neem',cam_close:'Sluit',
+    word:'Word',phrases:'Frases',phradd:'Voeg by',phrclose:'Sluit',phrnew:'Voeg ’n frase by…',
     markup:'Merk',capgps:'Kry GPS',update:'Werk by',logged:'Gelog',
     recmemo:'Neem memo op',stopmemo:'Stop',autosave:'Outomaties gestoor in hierdie blaaier. Rugsteun gereeld.',
     dupitem:'Dupliseer item',reinspect:'Herinspeksie',
@@ -404,6 +428,8 @@ function applyLang(){
   set('t_plan_h','plan_h');set('t_planimport','planimport');set('t_planrename','planrename');set('t_plandel','plandel');
   set('t_pmpin','pmpin');set('t_pmroom','pmroom');set('t_pmzone','pmzone');
   set('cam_flip','cam_flip');set('cam_shoot','cam_shoot');set('cam_close','cam_close');
+  set('t_word','word');set('t_phrases','phrases');set('t_phradd','phradd');set('t_phrclose','phrclose');
+  { const pn=document.getElementById('phraseNew'); if(pn) pn.placeholder=T('phrnew'); }
   const h=document.getElementById('hint'); if(!h.dataset.flashing) h.textContent=T('autosave');
 }
 function toggleLang(){ lang = lang==='en'?'af':'en'; localStorage.setItem('snag_lang',lang); applyLang(); render(); }
@@ -895,6 +921,38 @@ function savePhotoToDevice(dataURL, it){
   }catch(e){}
 }
 
+/* ================= reusable phrase library (Rapid Text) ================= */
+const PHRASES_KEY='snag_phrases';
+const DEFAULT_PHRASES=[
+  'Unit operational at time of inspection.',
+  'Visible corrosion to casing / housing.',
+  'Excessive noise / vibration noted.',
+  'Refrigerant / oil leak observed.',
+  'Thermal insulation damaged or missing.',
+  'Filters dirty — require cleaning / replacement.',
+  'No access — not inspected.',
+  'Beyond economical repair.',
+  'Compliant with relevant standards at time of inspection.',
+  'Service and re-inspect within 12 months.',
+  'Replace — end of service life.',
+  'Monitor condition; no immediate action required.',
+  'Allow budget for replacement within 1–5 years.',
+  'Specialist / further investigation required.'
+];
+let phrases=(()=>{ try{ const r=localStorage.getItem(PHRASES_KEY); if(r){ const a=JSON.parse(r); if(Array.isArray(a)&&a.length) return a; } }catch(e){} return DEFAULT_PHRASES.slice(); })();
+function savePhrases(){ try{ localStorage.setItem(PHRASES_KEY, JSON.stringify(phrases)); }catch(e){} }
+let phraseTarget=null;
+function openPhrases(id,key){ phraseTarget={id,key}; renderPhraseModal(); document.getElementById('phr').classList.add('on'); }
+function closePhrases(){ const m=document.getElementById('phr'); if(m) m.classList.remove('on'); phraseTarget=null; }
+function renderPhraseModal(){ const el=document.getElementById('phraseList'); if(!el) return;
+  el.innerHTML=phrases.map((p,i)=>`<span class="roomtag"><span class="ptxt" onclick="insertPhrase(${i})">${escHtml(p)}</span> <button onclick="delPhrase(${i})" title="delete">✕</button></span>`).join(''); }
+function insertPhrase(i){ const text=phrases[i]; if(text==null||!phraseTarget) return;
+  const it=items.find(x=>x.id===phraseTarget.id); if(!it){ closePhrases(); return; }
+  const cur=(it[phraseTarget.key]||'').trim(); const sep=cur?(/[.!?]$/.test(cur)?' ':'. '):'';
+  it[phraseTarget.key]=(cur+sep+text); touch(); closePhrases(); render(); }
+function addPhrase(){ const inp=document.getElementById('phraseNew'); const v=(inp&&inp.value||'').trim(); if(!v) return; phrases.push(v); savePhrases(); inp.value=''; renderPhraseModal(); }
+function delPhrase(i){ phrases.splice(i,1); savePhrases(); renderPhraseModal(); }
+
 /* ================= logo ================= */
 function pickLogo(){ const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.onchange=e=>{ const f=e.target.files[0]; if(!f) return; compress(f,400,0.85,d=>{ logoData=d; renderLogo(); touch(); }); }; openPicker(inp); }
 function clearLogo(){ logoData=null; renderLogo(); touch(); }
@@ -1012,7 +1070,9 @@ function itemCard(it){
     : '';
   // survey-only: recommendation + estimated cost + remaining service life
   const surveyFields = isSurvey()
-    ? `<div class="field"><label>${T('recommendation')}</label><textarea oninput="bind(${js(it.id)},'recommendation',this)" placeholder="...">${escHtml(it.recommendation||'')}</textarea></div>
+    ? `<div class="field"><div class="notes-head"><label>${T('recommendation')}</label>
+         <button class="mic" onclick="openPhrases(${js(it.id)},'recommendation')">📋 ${T('phrases')}</button></div>
+         <textarea oninput="bind(${js(it.id)},'recommendation',this)" placeholder="...">${escHtml(it.recommendation||'')}</textarea></div>
        <div class="grid2">
          <div class="field"><label>${T('cost')}</label><input value="${escAttr(it.cost||'')}" oninput="bind(${js(it.id)},'cost',this)" placeholder="e.g. 15000" inputmode="decimal"></div>
          <div class="field"><label>${T('life')}</label><input value="${escAttr(it.life||'')}" oninput="bind(${js(it.id)},'life',this)" placeholder="e.g. ~2 yrs"></div>
@@ -1041,7 +1101,10 @@ function itemCard(it){
       </div>
       ${surveyFields}
       <div class="field"><div class="notes-head"><label>${isSurvey()?T('observations'):T('notes')}</label>
-        <button class="mic" id="mic_${it.id}" data-rec="0" onclick="toggleDictation(${js(it.id)})"><span class="dot"></span>${T('dictate')}</button></div>
+        <div style="display:flex;gap:6px;">
+          <button class="mic" onclick="openPhrases(${js(it.id)},'notes')">📋 ${T('phrases')}</button>
+          <button class="mic" id="mic_${it.id}" data-rec="0" onclick="toggleDictation(${js(it.id)})"><span class="dot"></span>${T('dictate')}</button>
+        </div></div>
         <textarea id="notes_${it.id}" oninput="bind(${js(it.id)},'notes',this)" placeholder="...">${escHtml(it.notes)}</textarea>
         ${audioHtml}
       </div>
@@ -1113,6 +1176,81 @@ function exportCSV(){ saveCurrentToStore(); const m=meta();
   const lines=[head].concat(rows).map(r=>r.map(csvCell).join(',')).join('\r\n');
   const blob=new Blob(['\ufeff'+lines],{type:'text/csv;charset=utf-8'}); const a=document.createElement('a');
   a.href=URL.createObjectURL(blob); a.download=`Snag-${(m.no||'inspection').replace(/[^\w-]/g,'')}-${m.date||''}.csv`; a.click(); URL.revokeObjectURL(a.href); flash(lang==='af'?'CSV afgelaai.':'CSV downloaded.'); }
+
+/* ================= Word (.doc) — editable report =================
+   Dependency-free: an HTML document Word/LibreOffice/Google Docs open and fully edit.
+   Mirrors the PDF content and is mode-aware (snag vs condition survey). */
+function exportDOC(){
+  saveCurrentToStore();
+  const m=meta(); const survey=isSurvey(); const L=I18N[lang];
+  const esc=s=>(s==null?'':String(s)).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const nl2br=s=>esc(s).replace(/\n/g,'<br>');
+  const parseCost=c=>{const n=parseFloat(String(c==null?'':c).replace(/[^0-9.]/g,''));return isFinite(n)?n:0;};
+  const fmtCost=n=>'R '+Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,' ');
+  const sl={complete:T('complete'),incomplete:T('incomplete'),defect:T('defect')};
+  const rlabel=it=> survey ? (it.condition?T('cond_'+it.condition):'—') : (sl[it.status]||'—');
+  const num=it=>`${T(survey?'item_no':'snag_no')} ${String(it.snag).padStart(3,'0')}`;
+  let b='';
+  // letterhead
+  b+=`<table style="width:100%"><tr>`;
+  if(logoData) b+=`<td style="width:96px;vertical-align:top"><img src="${logoData}" style="width:84px"></td>`;
+  b+=`<td style="vertical-align:top"><div style="font-size:15pt;font-weight:bold">${esc(m.firm)}</div>`;
+  (m.details||'').split('\n').filter(Boolean).forEach(l=>b+=`<div style="font-size:9pt;color:#555">${esc(l)}</div>`);
+  b+=`</td></tr></table><hr>`;
+  b+=`<div style="font-size:16pt;font-weight:bold">${esc(T(survey?'pdf_title_survey':'pdf_title'))}</div>`;
+  b+=`<div style="color:#555;margin-bottom:8px">${esc(T(survey?'pdf_sub_survey':'pdf_sub'))}</div>`;
+  // project details
+  const drows=[[L.pname,m.name],[L.pno,m.no],[L.client,m.client],[L.addr,m.addr],[L.insp,m.inspector],[L.date,m.date],[L.weather,m.weather]];
+  b+=`<table style="border-collapse:collapse">`;
+  drows.forEach(r=>b+=`<tr><td style="font-weight:bold;padding:2px 14px 2px 0">${esc(r[0])}</td><td style="padding:2px 0">${esc(r[1]||'—')}</td></tr>`);
+  b+=`</table>`;
+  const TH='background:#1d212b;color:#fff;padding:5px;text-align:left;font-size:9pt';
+  const TD='padding:5px;border:1px solid #ccc;font-size:9pt';
+  const ordered=[...items].sort((a,b)=>a.snag-b.snag);
+  // summary
+  if(survey){
+    const counts=CONDITIONS.reduce((o,c)=>(o[c]=0,o),{}); let total=0;
+    items.forEach(it=>{ if(it.condition&&counts[it.condition]!=null)counts[it.condition]++; total+=parseCost(it.cost); });
+    b+=`<h2 style="font-size:13pt">${esc(T('pdf_summary_survey'))}</h2>`;
+    b+=`<p>`+CONDITIONS.map(c=>`${esc(T('cond_'+c))}: <b>${counts[c]}</b>`).join(' &nbsp;&nbsp; ')+`</p>`;
+    b+=`<p style="font-size:12pt"><b>${esc(T('pdf_total'))}: ${fmtCost(total)}</b></p>`;
+    const action=items.filter(i=>i.condition==='C'||i.condition==='D').sort((a,b)=>a.snag-b.snag);
+    if(action.length){ b+=`<table style="border-collapse:collapse;width:100%"><tr><th style="${TH}">${esc(T('item_no'))}</th><th style="${TH}">${esc(T('condition'))}</th><th style="${TH}">${esc(T('system'))}</th><th style="${TH}">${esc(T('loc'))}</th><th style="${TH}">${esc(T('cost'))}</th></tr>`;
+      action.forEach(it=>b+=`<tr><td style="${TD}">${String(it.snag).padStart(3,'0')}</td><td style="${TD}">${esc(rlabel(it))}</td><td style="${TD}">${esc(it.trade)}</td><td style="${TD}">${esc(it.loc)}</td><td style="${TD}">${it.cost?fmtCost(parseCost(it.cost)):'—'}</td></tr>`);
+      b+=`</table>`; }
+  } else {
+    const flagged=items.filter(i=>i.status==='defect'||i.status==='incomplete').sort((a,b)=>a.snag-b.snag);
+    if(flagged.length){ b+=`<h2 style="font-size:13pt">${esc(T('pdf_summary'))}</h2>`;
+      b+=`<table style="border-collapse:collapse;width:100%"><tr><th style="${TH}">Snag</th><th style="${TH}">Status</th><th style="${TH}">${esc(T('trade'))}</th><th style="${TH}">${esc(T('loc'))}</th><th style="${TH}">Pri.</th></tr>`;
+      flagged.forEach(it=>b+=`<tr><td style="${TD}">${String(it.snag).padStart(3,'0')}</td><td style="${TD}">${esc(rlabel(it))}</td><td style="${TD}">${esc(it.trade)}</td><td style="${TD}">${esc(it.loc)}</td><td style="${TD}">${esc(it.priority)}</td></tr>`);
+      b+=`</table>`; }
+  }
+  // detail
+  b+=`<h2 style="font-size:13pt">${esc(T(survey?'pdf_detail_survey':'pdf_detail'))}</h2>`;
+  const fld=(lbl,val)=>{ return val?`<div><b>${esc(lbl)}</b> ${esc(val)}</div>`:''; };
+  ordered.forEach(it=>{
+    b+=`<div style="margin-top:14px;border-top:1px solid #bbb;padding-top:8px">`;
+    const tag=[it.trade,it.priority].filter(Boolean).join(' · ');
+    b+=`<div style="font-weight:bold;font-size:12pt">${esc(num(it))} — ${esc(rlabel(it))}${tag?' ['+esc(tag)+']':''}</div>`;
+    if(survey) b+=fld(T('pdf_asset'),it.asset);
+    b+=fld(T('pdf_loc'),it.loc); if(it.room) b+=fld(T('room')+':',it.room);
+    b+=fld(T('pdf_logged'),it.ts);
+    if(it.gps) b+=fld('GPS:',`${it.gps.lat.toFixed(5)}, ${it.gps.lng.toFixed(5)} (±${it.gps.acc} m)`);
+    b+=`<div style="margin-top:4px"><b>${esc(T(survey?'pdf_obs':'pdf_notes'))}</b><br>${nl2br(it.notes||'—')}</div>`;
+    if(survey){ b+=`<div style="margin-top:4px"><b>${esc(T('pdf_rec'))}</b><br>${nl2br(it.recommendation||'—')}</div>`;
+      b+=fld(T('pdf_cost'), it.cost?fmtCost(parseCost(it.cost)):''); if(it.life) b+=fld(T('pdf_life'),it.life); }
+    if(it.photos&&it.photos.length){ b+=`<div style="margin-top:6px">`; it.photos.forEach(p=>b+=`<img src="${p}" style="width:45%;margin:2px;border:1px solid #ccc">`); b+=`</div>`; }
+    b+=`</div>`;
+  });
+  if(m.inspector){ b+=`<div style="margin-top:28px"><b>${esc(T('pdf_signoff'))}</b><br><br>__________________________<br>${esc(m.inspector)}${m.date?' — '+esc(m.date):''}</div>`; }
+  const head=`<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>${esc(m.name||'Inspection')}</title><style>@page{size:21cm 29.7cm;margin:2cm} body{font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#111}</style></head><body>`;
+  const html=head+b+`</body></html>`;
+  const blob=new Blob(['﻿'+html],{type:'application/msword'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=`${survey?'Survey':'Snag'}-${(m.no||'inspection').replace(/[^\w-]/g,'')}-${m.date||''}.doc`;
+  document.body.appendChild(a); a.click(); setTimeout(()=>{ try{ URL.revokeObjectURL(a.href); a.remove(); }catch(e){} },0);
+  flash(lang==='af'?'Word-dokument afgelaai.':'Word document downloaded.');
+}
 
 /* ================= PDF ================= */
 async function exportPDF(){
