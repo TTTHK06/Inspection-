@@ -86,6 +86,21 @@
   .chip[data-on="1"][data-v="complete"]{background:rgba(34,197,94,.15); border-color:var(--ok); color:#86efac;}
   .chip[data-on="1"][data-v="incomplete"]{background:rgba(245,158,11,.15); border-color:var(--warn); color:#fcd34d;}
   .chip[data-on="1"][data-v="defect"]{background:rgba(239,68,68,.15); border-color:var(--bad); color:#fca5a5;}
+  /* condition grades A–D + N/I (CIBSE Guide M traffic light) */
+  .chip[data-on="1"][data-v="A"]{background:rgba(34,197,94,.15); border-color:var(--ok); color:#86efac;}
+  .chip[data-on="1"][data-v="B"]{background:rgba(250,204,21,.15); border-color:var(--accent2); color:#fde68a;}
+  .chip[data-on="1"][data-v="C"]{background:rgba(245,158,11,.15); border-color:var(--warn); color:#fdba74;}
+  .chip[data-on="1"][data-v="D"]{background:rgba(239,68,68,.15); border-color:var(--bad); color:#fca5a5;}
+  .chip[data-on="1"][data-v="ni"]{background:rgba(100,116,139,.18); border-color:var(--na); color:#cbd5e1;}
+  .modebar{display:flex; align-items:center; gap:10px; margin-bottom:16px;}
+  .modebar-lbl{font-size:10px; letter-spacing:.8px; text-transform:uppercase; color:var(--muted); flex:none;}
+  .seg{display:flex; flex:1; border:1px solid var(--line); border-radius:8px; overflow:hidden; background:var(--bg);}
+  .seg-btn{flex:1; border:none; background:transparent; color:var(--muted); padding:10px 8px; font:inherit; font-size:12px; cursor:pointer; text-transform:uppercase; letter-spacing:.5px;}
+  .seg-btn[data-on="1"]{background:rgba(255,122,24,.16); color:var(--accent2); font-weight:700;}
+  /* distinct teal identity for condition-survey mode */
+  body.survey{ --accent:#0ea5e9; --accent2:#38bdf8;
+    background:radial-gradient(900px 500px at 100% -10%, rgba(14,165,233,.10), transparent 60%), var(--bg); }
+  body.survey .seg-btn[data-on="1"]{background:rgba(14,165,233,.18);}
 
   .photos{display:grid; grid-template-columns:repeat(auto-fill,minmax(90px,1fr)); gap:8px; margin-top:10px;}
   .thumb{position:relative; aspect-ratio:1; border-radius:8px; overflow:hidden; border:1px solid var(--line);}
@@ -192,6 +207,15 @@
     <button class="tb-btn" onclick="carryForward()" id="t_reinspect">Re-inspect</button>
     <button class="tb-btn" onclick="duplicateInspection()" id="t_dup">Duplicate</button>
     <button class="tb-btn" onclick="deleteInspection()" id="t_delinsp">Delete</button>
+  </div>
+
+  <!-- MODE: snag list vs condition survey (per inspection) -->
+  <div class="modebar">
+    <span class="modebar-lbl" id="t_mode">Mode</span>
+    <div class="seg" id="modeSeg">
+      <button class="seg-btn" data-mode="snag" onclick="setMode('snag')" id="t_mode_snag">Snag list</button>
+      <button class="seg-btn" data-mode="survey" onclick="setMode('survey')" id="t_mode_survey">Condition survey</button>
+    </div>
   </div>
 
   <section class="panel">
@@ -309,7 +333,16 @@ const I18N={
     pmpin:'Pin snag',pmroom:'Mark room',pmzone:'Draw room',room:'Room',planlink:'Plan',nolink:'Not on plan',
     pdf_title:'INSPECTION SNAG LIST',pdf_sub:'Works completed — site inspection record',
     pdf_summary:'Outstanding Items Summary',pdf_detail:'Inspection Detail',pdf_signoff:'Sign-off',
-    pdf_loc:'Location:',pdf_logged:'Logged:',pdf_notes:'Notes:'},
+    pdf_loc:'Location:',pdf_logged:'Logged:',pdf_notes:'Notes:',
+    mode:'Mode',mode_snag:'Snag list',mode_survey:'Condition survey',sub_survey:'Condition survey · existing building · PDF report',
+    condition:'Condition (CIBSE A–D)',cond_A:'A · Good',cond_B:'B · Satisf.',cond_C:'C · Poor',cond_D:'D · End-of-life',cond_ni:'N/I',
+    system:'System',asset:'Asset / equipment',timeframe:'Action / timeframe',observations:'Observations',life:'Remaining life',
+    recommendation:'Recommendation',cost:'Est. cost (R)',additem_survey:'＋ Add Survey Element',
+    snag_no:'SNAG',item_no:'ITEM',
+    pdf_title_survey:'BUILDING CONDITION SURVEY',pdf_sub_survey:'Existing building — condition assessment record',
+    pdf_summary_survey:'Condition Summary',pdf_detail_survey:'Condition Survey Detail',
+    pdf_rec:'Recommendation:',pdf_cost:'Est. cost:',pdf_total:'Total estimated cost',pdf_cond:'Condition:',
+    pdf_obs:'Observations:',pdf_asset:'Asset:',pdf_life:'Rem. life:',pdf_system:'System:'},
   af:{title:'Inspeksie Foutlys',sub:'Veldopname · terreinrekord · PDF-uitvoer',langBtn:'ENG',
     firm_h:'Firma / Briefhoof',logo:'Logo (opsioneel)',uplogo:'Laai Logo',rmlogo:'Verwyder',
     firmname:'Firmanaam',firmdet:'Firmabesonderhede (adres / tel / e-pos)',proj_h:'Projekbesonderhede',
@@ -326,18 +359,30 @@ const I18N={
     pmpin:'Pen fout',pmroom:'Merk kamer',pmzone:'Teken kamer',room:'Kamer',planlink:'Plan',nolink:'Nie op plan',
     pdf_title:'INSPEKSIE FOUTLYS',pdf_sub:'Werk voltooi — terrein-inspeksierekord',
     pdf_summary:'Uitstaande Items Opsomming',pdf_detail:'Inspeksiebesonderhede',pdf_signoff:'Goedkeuring',
-    pdf_loc:'Ligging:',pdf_logged:'Gelog:',pdf_notes:'Notas:'}
+    pdf_loc:'Ligging:',pdf_logged:'Gelog:',pdf_notes:'Notas:',
+    mode:'Modus',mode_snag:'Foutlys',mode_survey:'Toestandsopname',sub_survey:'Toestandsopname · bestaande gebou · PDF-verslag',
+    condition:'Toestand (CIBSE A–D)',cond_A:'A · Goed',cond_B:'B · Redelik',cond_C:'C · Swak',cond_D:'D · Einde-lewe',cond_ni:'N/G',
+    system:'Stelsel',asset:'Bate / toerusting',timeframe:'Aksie / tydraam',observations:'Waarnemings',life:'Oorblywende lewe',
+    recommendation:'Aanbeveling',cost:'Beraamde koste (R)',additem_survey:'＋ Voeg Opname-element By',
+    snag_no:'FOUT',item_no:'ITEM',
+    pdf_title_survey:'GEBOU TOESTANDSOPNAME',pdf_sub_survey:'Bestaande gebou — toestandbeoordelingsrekord',
+    pdf_summary_survey:'Toestand Opsomming',pdf_detail_survey:'Toestandsopname Besonderhede',
+    pdf_rec:'Aanbeveling:',pdf_cost:'Beraamde koste:',pdf_total:'Totale beraamde koste',pdf_cond:'Toestand:',
+    pdf_obs:'Waarnemings:',pdf_asset:'Bate:',pdf_life:'Oorbl. lewe:',pdf_system:'Stelsel:'}
 };
 let lang = localStorage.getItem('snag_lang') || 'en';
 function T(k){ return (I18N[lang]&&I18N[lang][k])||I18N.en[k]||k; }
 function applyLang(){
   document.documentElement.lang=lang;
   const set=(id,k)=>{const e=document.getElementById(id); if(e) e.textContent=T(k);};
-  set('t_title','title');set('t_sub','sub');set('langBtn','langBtn');
+  set('t_title','title');set('langBtn','langBtn');
+  { const sub=document.getElementById('t_sub'); if(sub) sub.textContent=T(isSurvey()?'sub_survey':'sub'); }
+  set('t_mode','mode');set('t_mode_snag','mode_snag');set('t_mode_survey','mode_survey');
   set('t_firm_h','firm_h');set('t_logo','logo');set('t_uplogo','uplogo');set('t_rmlogo','rmlogo');
   set('t_firmname','firmname');set('t_firmdet','firmdet');set('t_proj_h','proj_h');
   set('t_pname','pname');set('t_pno','pno');set('t_client','client');set('t_addr','addr');
-  set('t_insp','insp');set('t_date','date');set('t_weather','weather');set('t_additem','additem');
+  set('t_insp','insp');set('t_date','date');set('t_weather','weather');
+  { const ai=document.getElementById('t_additem'); if(ai) ai.textContent=T(isSurvey()?'additem_survey':'additem'); }
   set('t_backup','backup');set('t_restore','restore');set('t_csv','csv');set('t_pdf','pdf');
   set('t_new','new');set('t_dup','dup');set('t_delinsp','delinsp');
   const ri=document.getElementById('t_reinspect'); if(ri) ri.textContent=T('reinspect');
@@ -360,6 +405,15 @@ let activeFilters={status:new Set(),trade:new Set(),priority:new Set()};
 
 const TRADES=['HVAC','Wet Services','Fire','General/Other'];
 const PRIORITIES=['Critical','Minor'];
+// ----- condition survey (mechanical building services) vocab -----
+const CONDITIONS=['A','B','C','D','ni'];   // CIBSE Guide M condition grades A–D + Not Inspected
+const SYSTEMS=['HVAC','Ventilation','Heating','Cooling','Domestic Water','Drainage','Fire Protection','BMS / Controls','Gas','Other'];
+const TIMEFRAMES=['Immediate','Within 1 yr','1–5 yrs','5–10 yrs'];
+let curMode='snag';            // 'snag' | 'survey' — stored per inspection
+function isSurvey(){ return curMode==='survey'; }
+// mode-aware option lists (survey reuses the trade/priority fields with MEP-specific values)
+function tradeList(){ return isSurvey()?SYSTEMS:TRADES; }
+function prioList(){ return isSurvey()?TIMEFRAMES:PRIORITIES; }
 
 function nowStamp(){const d=new Date(),p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;}
 function uid(){return 'i'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
@@ -368,14 +422,36 @@ function uid(){return 'i'+Date.now().toString(36)+Math.random().toString(36).sli
 function openPicker(inp){ inp.style.display='none'; document.body.appendChild(inp);
   inp.addEventListener('change',()=>setTimeout(()=>inp.remove(),0),{once:true}); inp.click(); }
 
-function loadStore(){
-  try{ const raw=localStorage.getItem(STORE_KEY); if(raw){ store=JSON.parse(raw); return; } }catch(e){}
-  // migrate old single-draft if present
+/* ===== persistence: IndexedDB primary (hundreds of MB), localStorage fallback =====
+   IndexedDB lifts the old ~5–10 MB localStorage cap that limited photo-heavy surveys.
+   The whole `store` object is kept under one key; structured-clone handles the nested data. */
+const DB_NAME='snag_db', DB_STORE='kv', DB_KEY='store';
+let _db=null;
+function idbOpen(){ return new Promise((res,rej)=>{
+  if(!window.indexedDB){ rej(new Error('no-idb')); return; }
+  let r; try{ r=indexedDB.open(DB_NAME,1); }catch(e){ rej(e); return; }
+  r.onupgradeneeded=()=>{ const db=r.result; if(!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE); };
+  r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); r.onblocked=()=>rej(new Error('blocked'));
+}); }
+function idbGet(key){ return new Promise((res,rej)=>{ try{ const tx=_db.transaction(DB_STORE,'readonly'); const rq=tx.objectStore(DB_STORE).get(key); rq.onsuccess=()=>res(rq.result); rq.onerror=()=>rej(rq.error); }catch(e){ rej(e); } }); }
+function idbSet(key,val){ return new Promise((res,rej)=>{ try{ const tx=_db.transaction(DB_STORE,'readwrite'); tx.objectStore(DB_STORE).put(val,key); tx.oncomplete=()=>res(true); tx.onerror=()=>rej(tx.error); tx.onabort=()=>rej(tx.error||new Error('abort')); }catch(e){ rej(e); } }); }
+
+async function loadStore(){
+  try{ _db = await idbOpen(); }catch(e){ _db=null; }
+  const valid=s=>s&&s.inspections&&Array.isArray(s.order)&&s.order.length&&s.current;
+  // 1) IndexedDB (primary)
+  if(_db){ try{ const s=await idbGet(DB_KEY); if(valid(s)){ store=s; return; } }catch(e){} }
+  // 2) migrate an existing localStorage store from earlier versions
+  try{ const raw=localStorage.getItem(STORE_KEY); if(raw){ const s=JSON.parse(raw); if(valid(s)){ store=s; await persistStore(); return; } } }catch(e){}
+  // 3) migrate very old single-draft
   try{ const old=localStorage.getItem('snag_draft'); if(old){ const d=JSON.parse(old); const id=uid();
-    store={inspections:{[id]:d},order:[id],current:id}; persistStore(); return; } }catch(e){}
+    store={inspections:{[id]:d},order:[id],current:id}; await persistStore(); return; } }catch(e){}
+  // 4) fresh
   const id=uid(); store={inspections:{[id]:blankSnapshot()},order:[id],current:id};
 }
-function persistStore(){
+// Returns true on success, false if storage is full (caller may roll back). Never rejects.
+async function persistStore(){
+  if(_db){ try{ await idbSet(DB_KEY, store); return true; }catch(e){ /* fall through to localStorage */ } }
   try{ localStorage.setItem(STORE_KEY, JSON.stringify(store)); return true; }
   catch(e){ flash(lang==='af'?'Stoor misluk — berging vol. Rugsteun na lêer.':'Save failed — storage full. Back up to file.'); return false; }
 }
@@ -395,9 +471,9 @@ function applyFirmDefaults(snap){
   if(!snap.logo && FIRM_DEFAULTS.logo && FIRM_DEFAULTS.logo!=='__LOGO_DATA_URL__') snap.logo = FIRM_DEFAULTS.logo;
   return snap;
 }
-function blankSnapshot(){ return applyFirmDefaults({meta:{firm:'',details:'',name:'',no:'',client:'',addr:'',inspector:'',date:new Date().toISOString().slice(0,10),weather:''}, items:[], seq:0, logo:null, plans:[], v:4}); }
+function blankSnapshot(){ return applyFirmDefaults({meta:{firm:'',details:'',name:'',no:'',client:'',addr:'',inspector:'',date:new Date().toISOString().slice(0,10),weather:''}, items:[], seq:0, logo:null, plans:[], mode:'snag', v:4}); }
 
-function curSnapshot(){ return {meta:meta(), items, seq, logo:logoData, plans, v:4}; }
+function curSnapshot(){ return {meta:meta(), items, seq, logo:logoData, plans, mode:curMode, v:4}; }
 function saveCurrentToStore(){ if(store.current){ store.inspections[store.current]=curSnapshot(); } }
 
 let autosaveTimer=null;
@@ -410,14 +486,16 @@ function loadCurrentFromStore(){
 }
 function applySnapshotToForm(d){
   const m=d.meta||{};
+  curMode = (d.mode==='survey') ? 'survey' : 'snag';
   setVal('f_firm',m.firm);setVal('f_details',m.details);setVal('p_name',m.name);setVal('p_no',m.no);
   setVal('p_client',m.client);setVal('p_addr',m.addr);setVal('p_inspector',m.inspector);
   setVal('p_date',m.date||new Date().toISOString().slice(0,10));setVal('p_weather',m.weather);
-  items=(d.items||[]).map(it=>Object.assign({trade:'',priority:'',gps:null,history:[],snag:0,audio:null,room:'',planRef:null},it));
+  items=(d.items||[]).map(it=>Object.assign({trade:'',priority:'',gps:null,history:[],snag:0,audio:null,room:'',planRef:null,condition:'',recommendation:'',cost:'',asset:'',life:''},it));
   seq=d.seq || items.reduce((mx,i)=>Math.max(mx,i.snag||0),0);
   logoData=d.logo||null; renderLogo();
   plans=(d.plans||[]).map(p=>Object.assign({id:'',name:'',img:'',w:0,h:0,rooms:[],zones:[]},p));
   curPlanPage = plans.length?0:-1; renderPlanPanel();
+  updateModeBar(); applyLang();
 }
 function inspLabel(d){ const m=d.meta||{}; const nm=m.name||'(untitled)'; return (m.no?m.no+' — ':'')+nm; }
 function renderInspSelector(){
@@ -439,7 +517,7 @@ function deleteInspection(){
 /* ================= items ================= */
 function addItem(data){
   if(data){ items.push(data); }
-  else{ seq++; items.push({id:uid(),snag:seq,loc:'',status:'',trade:'',priority:'',notes:'',photos:[],audio:null,gps:null,ts:nowStamp(),history:[]}); }
+  else{ seq++; items.push({id:uid(),snag:seq,loc:'',asset:'',life:'',status:'',condition:'',recommendation:'',cost:'',trade:'',priority:'',notes:'',photos:[],audio:null,gps:null,ts:nowStamp(),history:[]}); }
   touch(); render();
 }
 function delItem(id){ if(!confirm(lang==='af'?'Skrap hierdie item?':'Delete this item?')) return; items=items.filter(i=>i.id!==id); touch(); render(); }
@@ -464,13 +542,35 @@ function carryForward(){
     c.history=(c.history||[]).concat([{ts:nowStamp(),from:c.status||'(none)',to:'re-inspect'}]);
     return c; });
   const snap={ meta:Object.assign({},m,{date:today, name:(m.name||'')+(lang==='af'?' (herinspeksie)':' (re-inspection)')}),
-    items:carried, seq:carried.length, logo:src.logo||null, plans:JSON.parse(JSON.stringify(src.plans||[])), v:4 };
+    items:carried, seq:carried.length, logo:src.logo||null, plans:JSON.parse(JSON.stringify(src.plans||[])), mode:src.mode||'snag', v:4 };
   const id=uid(); store.inspections[id]=snap; store.order.push(id); store.current=id;
   loadCurrentFromStore(); render(); renderInspSelector(); persistStore();
   flash(lang==='af'?'Herinspeksie geskep met uitstaande items.':'Re-inspection created with outstanding items.');
 }
 function setStatus(id,val){ const it=items.find(i=>i.id===id); if(!it) return; const old=it.status;
   it.status=(it.status===val)?'':val; if(it.status&&it.status!==old){ it.history.push({ts:nowStamp(),from:old||'(none)',to:it.status}); } touch(); render(); }
+function setCondition(id,val){ const it=items.find(i=>i.id===id); if(!it) return; const old=it.condition||'';
+  it.condition=(it.condition===val)?'':val;
+  if(it.condition&&it.condition!==old){ it.history.push({ts:nowStamp(),from:old?T('cond_'+old):'(none)',to:T('cond_'+it.condition)}); }
+  touch(); render(); }
+
+/* ===== mode (snag list vs condition survey) ===== */
+function setMode(m){ const nm=(m==='survey')?'survey':'snag'; if(nm===curMode){ updateModeBar(); return; }
+  curMode=nm; saveCurrentToStore(); persistStore();
+  // reset the status/condition filter group since its values differ between modes
+  activeFilters.status=new Set();
+  applyLang(); updateModeBar(); render();
+  flash(isSurvey()?(lang==='af'?'Toestandsopname-modus.':'Condition-survey mode.'):(lang==='af'?'Foutlys-modus.':'Snag-list mode.')); }
+function updateModeBar(){ document.querySelectorAll('#modeSeg .seg-btn').forEach(b=>b.dataset.on=(b.dataset.mode===curMode)?'1':'0');
+  document.body.classList.toggle('survey', isSurvey()); }
+// the rating value + display colour for an item, mode-aware
+function ratingVal(it){ return isSurvey()? (it.condition||'') : (it.status||''); }
+function ratingHex(it){ const v=ratingVal(it);
+  if(isSurvey()) return v==='D'?'#ef4444':v==='C'?'#f59e0b':v==='B'?'#facc15':v==='A'?'#22c55e':v==='ni'?'#64748b':'#0ea5e9';
+  return v==='defect'?'#ef4444':v==='incomplete'?'#f59e0b':v==='complete'?'#22c55e':'#ff7a18'; }
+function ratingRGB(it){ const v=ratingVal(it);
+  if(isSurvey()) return v==='D'?[239,68,68]:v==='C'?[245,158,11]:v==='B'?[250,204,21]:v==='A'?[34,197,94]:v==='ni'?[100,116,139]:[14,165,233];
+  return v==='defect'?[239,68,68]:v==='incomplete'?[245,158,11]:v==='complete'?[34,197,94]:[255,122,24]; }
 function bind(id,key,el){ const it=items.find(i=>i.id===id); if(it) it[key]=el.value; if(key==='loc') updateLocLabel(id,el.value); touch(); }
 function updateLocLabel(id,val){ const lbl=document.getElementById('loclbl_'+id); if(lbl) lbl.textContent=val||'(no location set)'; }
 
@@ -536,11 +636,11 @@ async function loadPlanFromFile(f){
 
   // Verify it actually persists; if storage is full, roll back so we don't show phantom plans that vanish on reload.
   saveCurrentToStore();
-  const ok = persistStore();
+  const ok = await persistStore();
   if(!ok){
     plans = plansBefore;                 // roll back in memory
     curPlanPage = plans.length?Math.min(curPlanPage,plans.length-1):-1;
-    saveCurrentToStore(); persistStore();
+    saveCurrentToStore(); await persistStore();
     renderPlanPanel();
     flash(lang==='af'
       ? 'Berging vol — plan nie gestoor nie. Rugsteun & skrap ou inspeksies, of voer minder bladsye in.'
@@ -627,9 +727,9 @@ function drawPlanOverlay(){
   items.filter(it=>it.planRef&&it.planRef.planId===p.id).forEach(it=>{
     const pin=document.createElement('div'); pin.className='pin';
     pin.style.left=(it.planRef.fx*100)+'%'; pin.style.top=(it.planRef.fy*100)+'%';
-    const col=it.status==='defect'?'#ef4444':it.status==='incomplete'?'#f59e0b':it.status==='complete'?'#22c55e':'#ff7a18';
+    const col=ratingHex(it);
     pin.innerHTML=`<svg viewBox="0 0 26 34"><path d="M13 0C6 0 0 5.5 0 12.5 0 22 13 34 13 34s13-12 13-21.5C26 5.5 20 0 13 0z" fill="${col}"/></svg><span>${String(it.snag).padStart(2,'0')}</span>`;
-    pin.title='SNAG '+String(it.snag).padStart(3,'0')+(it.loc?' — '+it.loc:'');
+    pin.title=T(isSurvey()?'item_no':'snag_no')+' '+String(it.snag).padStart(3,'0')+(it.loc?' — '+it.loc:'');
     ov.appendChild(pin);
   });
 }
@@ -817,48 +917,66 @@ function closeAnnot(save){ if(save&&annotTarget){ const cv=document.getElementBy
 
 /* ================= filters ================= */
 function toggleFilter(g,v){ const s=activeFilters[g]; if(s.has(v)) s.delete(v); else s.add(v); render(); }
-function passesFilter(it){ if(activeFilters.status.size&&!activeFilters.status.has(it.status)) return false;
+function passesFilter(it){ const rv=isSurvey()?(it.condition||''):(it.status||'');
+  if(activeFilters.status.size&&!activeFilters.status.has(rv)) return false;
   if(activeFilters.trade.size&&!activeFilters.trade.has(it.trade)) return false;
   if(activeFilters.priority.size&&!activeFilters.priority.has(it.priority)) return false; return true; }
 function renderFilters(){ const f=document.getElementById('filters');
-  const groups=[['status',['complete','incomplete','defect']],['trade',TRADES],['priority',PRIORITIES]]; let html='';
-  groups.forEach(([g,vals])=>vals.forEach(v=>{ const on=activeFilters[g].has(v)?1:0; const lbl=(g==='status')?T(v):v;
+  const ratingVals=isSurvey()?CONDITIONS:['complete','incomplete','defect'];
+  const groups=[['status',ratingVals],['trade',tradeList()],['priority',prioList()]]; let html='';
+  groups.forEach(([g,vals])=>vals.forEach(v=>{ const on=activeFilters[g].has(v)?1:0;
+    const lbl=(g==='status')?(isSurvey()?T('cond_'+v):T(v)):v;
     html+=`<div class="fchip" data-on="${on}" onclick="toggleFilter('${g}','${v.replace(/'/g,"\\'")}')">${lbl}</div>`; })); f.innerHTML=html; }
 
 /* ================= render ================= */
 function itemCard(it){
-  const div=document.createElement('div'); div.className='item'+(it.status==='complete'?' closed':'');
+  const div=document.createElement('div'); div.className='item'+((!isSurvey()&&it.status==='complete')?' closed':'');
   const photoHtml=it.photos.map((p,pi)=>`<div class="thumb"><img src="${p}"><button class="x" onclick="delPhoto(${js(it.id)},${pi})">&times;</button><button class="edit" onclick="openAnnot(${js(it.id)},${pi})">${T('markup')}</button></div>`).join('');
   const gpsHtml=it.gps?`<span class="coord">${it.gps.lat.toFixed(5)}, ${it.gps.lng.toFixed(5)} (±${it.gps.acc}m)</span><button onclick="captureGPS(${js(it.id)})">${T('update')}</button>`:`<button onclick="captureGPS(${js(it.id)})">📍 ${T('capgps')}</button>`;
   const histHtml=it.history&&it.history.length?`<div class="hist">${it.history.map(h=>`<div class="h-line">${h.ts} — <b>${h.from} → ${h.to}</b></div>`).join('')}</div>`:'';
   const audioHtml=it.audio?`<div class="audio-row"><audio controls src="${it.audio}"></audio><button class="recbtn" onclick="delAudio(${js(it.id)})">✕</button></div>`:`<div class="audio-row"><button class="recbtn" id="rec_${it.id}" data-rec="0" onclick="toggleAudio(${js(it.id)})">🎙 ${T('recmemo')}</button></div>`;
-  const tradeOpts=['<option value="">— '+T('trade')+' —</option>'].concat(TRADES.map(t=>`<option value="${t}"${it.trade===t?' selected':''}>${t}</option>`)).join('');
-  const prioOpts=['<option value="">— '+T('priority')+' —</option>'].concat(PRIORITIES.map(p=>`<option value="${p}"${it.priority===p?' selected':''}>${p}</option>`)).join('');
+  const tradeOpts=['<option value="">— '+(isSurvey()?T('system'):T('trade'))+' —</option>'].concat(tradeList().map(t=>`<option value="${t}"${it.trade===t?' selected':''}>${t}</option>`)).join('');
+  const prioOpts=['<option value="">— '+(isSurvey()?T('timeframe'):T('priority'))+' —</option>'].concat(prioList().map(p=>`<option value="${p}"${it.priority===p?' selected':''}>${p}</option>`)).join('');
+  // rating chips: condition grade (survey) or status (snag)
+  const ratingLabel = isSurvey()? T('condition') : 'Status';
+  const ratingChipsHtml = isSurvey()
+    ? CONDITIONS.map(c=>`<div class="chip" data-v="${c}" data-on="${it.condition===c?1:0}" onclick="setCondition(${js(it.id)},'${c}')">${T('cond_'+c)}</div>`).join('')
+    : ['complete','incomplete','defect'].map(s=>`<div class="chip" data-v="${s}" data-on="${it.status===s?1:0}" onclick="setStatus(${js(it.id)},'${s}')">${T(s)}</div>`).join('');
+  // survey-only: asset/equipment (identity) shown above location
+  const assetField = isSurvey()
+    ? `<div class="field"><label>${T('asset')}</label><input value="${escAttr(it.asset||'')}" oninput="bind(${js(it.id)},'asset',this)" placeholder="e.g. AHU-2 · Chiller 450kW · Calorifier"></div>`
+    : '';
+  // survey-only: recommendation + estimated cost + remaining service life
+  const surveyFields = isSurvey()
+    ? `<div class="field"><label>${T('recommendation')}</label><textarea oninput="bind(${js(it.id)},'recommendation',this)" placeholder="...">${escHtml(it.recommendation||'')}</textarea></div>
+       <div class="grid2">
+         <div class="field"><label>${T('cost')}</label><input value="${escAttr(it.cost||'')}" oninput="bind(${js(it.id)},'cost',this)" placeholder="e.g. 15000" inputmode="decimal"></div>
+         <div class="field"><label>${T('life')}</label><input value="${escAttr(it.life||'')}" oninput="bind(${js(it.id)},'life',this)" placeholder="e.g. ~2 yrs"></div>
+       </div>`
+    : '';
   div.innerHTML=`
     <div class="item-head">
-      <span class="item-no">SNAG ${String(it.snag).padStart(3,'0')}</span>
+      <span class="item-no">${T(isSurvey()?'item_no':'snag_no')} ${String(it.snag).padStart(3,'0')}</span>
       <span class="loc" id="loclbl_${it.id}">${it.loc||'(no location set)'}</span>
       <button class="del" style="border-color:var(--line);color:var(--muted)" onclick="dupItem(${js(it.id)})" title="${T('dupitem')}">⧉</button>
       <button class="del" onclick="delItem(${js(it.id)})">✕</button>
     </div>
     <div class="item-body">
+      ${assetField}
       <div class="field"><label>${T('loc')}</label><input value="${escAttr(it.loc)}" oninput="bind(${js(it.id)},'loc',this)" placeholder="e.g. Plant room, Roof level AHU-2"></div>
       <div class="grid2">
         <div class="field"><label>${T('room')}</label><input value="${escAttr(it.room||'')}" oninput="bind(${js(it.id)},'room',this)" placeholder="${T('room')}"></div>
         <div class="field"><label>${T('planlink')}</label><div style="font-size:11px;color:${it.planRef?'var(--ok)':'var(--na)'};padding:11px 0;">${it.planRef?('📍 '+planNameById(it.planRef.planId)):T('nolink')}</div></div>
       </div>
       <div class="grid2">
-        <div class="field"><label>${T('trade')}</label><select onchange="bind(${js(it.id)},'trade',this)">${tradeOpts}</select></div>
-        <div class="field"><label>${T('priority')}</label><select onchange="bind(${js(it.id)},'priority',this)">${prioOpts}</select></div>
+        <div class="field"><label>${isSurvey()?T('system'):T('trade')}</label><select onchange="bind(${js(it.id)},'trade',this)">${tradeOpts}</select></div>
+        <div class="field"><label>${isSurvey()?T('timeframe'):T('priority')}</label><select onchange="bind(${js(it.id)},'priority',this)">${prioOpts}</select></div>
       </div>
-      <div class="field"><label>Status</label>
-        <div class="status-row">
-          <div class="chip" data-v="complete" data-on="${it.status==='complete'?1:0}" onclick="setStatus(${js(it.id)},'complete')">${T('complete')}</div>
-          <div class="chip" data-v="incomplete" data-on="${it.status==='incomplete'?1:0}" onclick="setStatus(${js(it.id)},'incomplete')">${T('incomplete')}</div>
-          <div class="chip" data-v="defect" data-on="${it.status==='defect'?1:0}" onclick="setStatus(${js(it.id)},'defect')">${T('defect')}</div>
-        </div>${histHtml}
+      <div class="field"><label>${ratingLabel}</label>
+        <div class="status-row">${ratingChipsHtml}</div>${histHtml}
       </div>
-      <div class="field"><div class="notes-head"><label>${T('notes')}</label>
+      ${surveyFields}
+      <div class="field"><div class="notes-head"><label>${isSurvey()?T('observations'):T('notes')}</label>
         <button class="mic" id="mic_${it.id}" data-rec="0" onclick="toggleDictation(${js(it.id)})"><span class="dot"></span>${T('dictate')}</button></div>
         <textarea id="notes_${it.id}" oninput="bind(${js(it.id)},'notes',this)" placeholder="...">${escHtml(it.notes)}</textarea>
         ${audioHtml}
@@ -881,6 +999,11 @@ function render(){
   const c=document.getElementById('items'); c.innerHTML='';
   const shown=items.filter(passesFilter);
   if(shown.length===0){ c.innerHTML=`<div class="panel" style="text-align:center;color:var(--muted);font-size:12px">${lang==='af'?'Geen items pas by die filter nie.':'No items match the current filter.'}</div>`; return; }
+  if(isSurvey()){
+    // condition survey: a flat asset register, no open/closed split
+    shown.slice().sort((a,b)=>a.snag-b.snag).forEach(it=>c.appendChild(itemCard(it)));
+    return;
+  }
   const open=shown.filter(i=>i.status!=='complete').sort((a,b)=>a.snag-b.snag);
   const closed=shown.filter(i=>i.status==='complete').sort((a,b)=>a.snag-b.snag);
   open.forEach(it=>c.appendChild(itemCard(it)));
@@ -914,10 +1037,15 @@ function importJSON(){ const inp=document.createElement('input'); inp.type='file
 /* ================= CSV export ================= */
 function csvCell(v){ v=(v==null?'':String(v)); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }
 function exportCSV(){ saveCurrentToStore(); const m=meta();
-  const head=['Snag','Status','Trade','Priority','Location','Notes','GPS Lat','GPS Lng','Logged'];
-  const rows=[...items].sort((a,b)=>a.snag-b.snag).map(it=>[
-    String(it.snag).padStart(3,'0'),it.status||'',it.trade||'',it.priority||'',it.loc||'',it.notes||'',
-    it.gps?it.gps.lat.toFixed(6):'',it.gps?it.gps.lng.toFixed(6):'',it.ts||'']);
+  const cgrade=c=> c==='ni'?'N/I':(c||'');
+  const head = isSurvey()
+    ? ['Item','Condition','System','Asset','Location','Observations','Recommendation','Timeframe','Est. Cost','Remaining Life','GPS Lat','GPS Lng','Logged']
+    : ['Snag','Status','Trade','Priority','Location','Notes','GPS Lat','GPS Lng','Logged'];
+  const rows=[...items].sort((a,b)=>a.snag-b.snag).map(it=> isSurvey()
+    ? [String(it.snag).padStart(3,'0'),cgrade(it.condition),it.trade||'',it.asset||'',it.loc||'',it.notes||'',it.recommendation||'',it.priority||'',it.cost||'',it.life||'',
+       it.gps?it.gps.lat.toFixed(6):'',it.gps?it.gps.lng.toFixed(6):'',it.ts||'']
+    : [String(it.snag).padStart(3,'0'),it.status||'',it.trade||'',it.priority||'',it.loc||'',it.notes||'',
+       it.gps?it.gps.lat.toFixed(6):'',it.gps?it.gps.lng.toFixed(6):'',it.ts||'']);
   const lines=[head].concat(rows).map(r=>r.map(csvCell).join(',')).join('\r\n');
   const blob=new Blob(['\ufeff'+lines],{type:'text/csv;charset=utf-8'}); const a=document.createElement('a');
   a.href=URL.createObjectURL(blob); a.download=`Snag-${(m.no||'inspection').replace(/[^\w-]/g,'')}-${m.date||''}.csv`; a.click(); URL.revokeObjectURL(a.href); flash(lang==='af'?'CSV afgelaai.':'CSV downloaded.'); }
@@ -944,8 +1072,8 @@ async function exportPDF(){
   doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(90); let dy=y+10;
   (m.details||'').split('\n').filter(Boolean).forEach(l=>{ doc.text(l,tx,dy); dy+=4; });
   y=Math.max(headBottom,dy,y+12)+3; line(y); y+=7;
-  doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(20); doc.text(T('pdf_title'),M,y); y+=6;
-  doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(90); doc.text(T('pdf_sub'),M,y); y+=5;
+  doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(20); doc.text(T(isSurvey()?'pdf_title_survey':'pdf_title'),M,y); y+=6;
+  doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(90); doc.text(T(isSurvey()?'pdf_sub_survey':'pdf_sub'),M,y); y+=5;
   const L=I18N[lang];
   const rows=[[L.pname,m.name],[L.pno,m.no],[L.client,m.client],[L.addr,m.addr],[L.insp,m.inspector],[L.date,m.date],[L.weather,m.weather]];
   doc.setFontSize(9.5);
@@ -953,28 +1081,59 @@ async function exportPDF(){
     doc.setFont('helvetica','normal'); doc.setTextColor(20); doc.text(doc.splitTextToSize(r[1]||'—',W-M-58),M+48,y); y+=6; });
   y+=1; line(y); y+=8;
   const sl={complete:T('complete').toUpperCase(),incomplete:T('incomplete').toUpperCase(),defect:T('defect').toUpperCase(),'':'—'};
-  const flagged=items.filter(i=>i.status==='defect'||i.status==='incomplete').sort((a,b)=>a.snag-b.snag);
-  if(flagged.length){
-    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20); doc.text('1.0  '+T('pdf_summary'),M,y); y+=6;
-    const cols=[['Snag',16],['Status',26],[T('trade'),30],[T('loc'),62],['Pri.',20]];
-    doc.setFillColor(28,33,43); doc.rect(M,y-4.5,W-2*M,7,'F'); doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(255);
-    let cx=M+1.5; cols.forEach(c=>{ doc.text(String(c[0]),cx,y); cx+=c[1]; }); y+=6;
-    doc.setFont('helvetica','normal'); doc.setTextColor(25);
-    flagged.forEach((it,i)=>{ ck(7); if(i%2){ doc.setFillColor(244,245,247); doc.rect(M,y-4.2,W-2*M,6,'F'); } cx=M+1.5;
-      [String(it.snag).padStart(3,'0'),sl[it.status],it.trade||'—',it.loc||'—',it.priority||'—'].forEach((t,j)=>{ doc.text(doc.splitTextToSize(t,cols[j][1]-2),cx,y); cx+=cols[j][1]; }); y+=6; });
+  const rlabel=(it)=> isSurvey() ? (it.condition? T('cond_'+it.condition).toUpperCase() : '—') : (sl[it.status]||'—');
+  const parseCost=(c)=>{ const n=parseFloat(String(c==null?'':c).replace(/[^0-9.]/g,'')); return isFinite(n)?n:0; };
+  const fmtCost=(n)=>'R '+Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,' ');
+  let secNo=1;
+  if(isSurvey()){
+    // ---- Condition Summary: rating counts, total estimated cost, action items (Poor + Fair) ----
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20); doc.text(secNo.toFixed(1)+'  '+T('pdf_summary_survey'),M,y); y+=6; secNo++;
+    const counts=CONDITIONS.reduce((o,c)=>(o[c]=0,o),{}); let total=0;
+    items.forEach(it=>{ if(it.condition&&counts[it.condition]!=null) counts[it.condition]++; total+=parseCost(it.cost); });
+    doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(40);
+    doc.text(CONDITIONS.map(c=>`${T('cond_'+c)}: ${counts[c]}`).join('      '),M,y); y+=6;
+    doc.setFont('helvetica','bold'); doc.text(T('pdf_total')+':  '+fmtCost(total),M,y); y+=7; doc.setFont('helvetica','normal');
+    const action=items.filter(i=>i.condition==='C'||i.condition==='D').sort((a,b)=>a.snag-b.snag);
+    if(action.length){
+      const cols=[[T('item_no'),16],[T('pdf_cond').replace(':',''),26],[T('trade'),28],[T('loc'),54],['R',30]];
+      doc.setFillColor(28,33,43); doc.rect(M,y-4.5,W-2*M,7,'F'); doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(255);
+      let cx=M+1.5; cols.forEach(c=>{ doc.text(String(c[0]),cx,y); cx+=c[1]; }); y+=6;
+      doc.setFont('helvetica','normal'); doc.setTextColor(25);
+      action.forEach((it,i)=>{ ck(7); if(i%2){ doc.setFillColor(244,245,247); doc.rect(M,y-4.2,W-2*M,6,'F'); } cx=M+1.5;
+        [String(it.snag).padStart(3,'0'),rlabel(it),it.trade||'—',it.loc||'—',it.cost?fmtCost(parseCost(it.cost)):'—'].forEach((t,j)=>{ doc.text(doc.splitTextToSize(String(t),cols[j][1]-2),cx,y); cx+=cols[j][1]; }); y+=6; });
+    }
     y+=3; line(y,true); y+=8;
+  } else {
+    const flagged=items.filter(i=>i.status==='defect'||i.status==='incomplete').sort((a,b)=>a.snag-b.snag);
+    if(flagged.length){ secNo=2;
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20); doc.text('1.0  '+T('pdf_summary'),M,y); y+=6;
+      const cols=[['Snag',16],['Status',26],[T('trade'),30],[T('loc'),62],['Pri.',20]];
+      doc.setFillColor(28,33,43); doc.rect(M,y-4.5,W-2*M,7,'F'); doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(255);
+      let cx=M+1.5; cols.forEach(c=>{ doc.text(String(c[0]),cx,y); cx+=c[1]; }); y+=6;
+      doc.setFont('helvetica','normal'); doc.setTextColor(25);
+      flagged.forEach((it,i)=>{ ck(7); if(i%2){ doc.setFillColor(244,245,247); doc.rect(M,y-4.2,W-2*M,6,'F'); } cx=M+1.5;
+        [String(it.snag).padStart(3,'0'),sl[it.status],it.trade||'—',it.loc||'—',it.priority||'—'].forEach((t,j)=>{ doc.text(doc.splitTextToSize(t,cols[j][1]-2),cx,y); cx+=cols[j][1]; }); y+=6; });
+      y+=3; line(y,true); y+=8;
+    }
   }
-  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20); ck(10); doc.text((flagged.length?'2.0':'1.0')+'  '+T('pdf_detail'),M,y); y+=7;
+  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20); ck(10); doc.text(secNo.toFixed(1)+'  '+T(isSurvey()?'pdf_detail_survey':'pdf_detail'),M,y); y+=7;
   const ordered=[...items].sort((a,b)=>a.snag-b.snag);
   for(const it of ordered){ ck(30);
     doc.setFillColor(28,33,43); doc.rect(M,y-4.5,W-2*M,7,'F'); doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(255);
-    doc.text(`SNAG ${String(it.snag).padStart(3,'0')}`,M+2,y); doc.setTextColor(250,200,60);
-    const tag=[it.trade,it.priority].filter(Boolean).join(' · '); doc.text(`${sl[it.status]||'—'}${tag?'   ['+tag+']':''}`,W-M-2,y,{align:'right'}); y+=8; doc.setTextColor(20);
+    doc.text(`${T(isSurvey()?'item_no':'snag_no')} ${String(it.snag).padStart(3,'0')}`,M+2,y); doc.setTextColor(250,200,60);
+    const tag=[it.trade,it.priority].filter(Boolean).join(' · '); doc.text(`${rlabel(it)}${tag?'   ['+tag+']':''}`,W-M-2,y,{align:'right'}); y+=8; doc.setTextColor(20);
     const fld=(lbl,txt)=>{ doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.text(lbl,M,y); doc.setFont('helvetica','normal'); const t=doc.splitTextToSize(txt||'—',W-M-30); doc.text(t,M+26,y); y+=5*t.length+1; };
+    if(isSurvey()&&it.asset) fld(T('pdf_asset'),it.asset);
     fld(T('pdf_loc'),it.loc); fld(T('pdf_logged'),it.ts); if(it.gps) fld('GPS:',`${it.gps.lat.toFixed(5)}, ${it.gps.lng.toFixed(5)} (±${it.gps.acc} m)`);
     if(it.audio) fld('Audio:',lang==='af'?'(stemmemo in rugsteun)':'(voice memo in backup)');
-    doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.text(T('pdf_notes'),M,y); y+=5; doc.setFont('helvetica','normal');
+    doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.text(T(isSurvey()?'pdf_obs':'pdf_notes'),M,y); y+=5; doc.setFont('helvetica','normal');
     doc.splitTextToSize(it.notes||'—',W-2*M).forEach(t=>{ ck(6); doc.text(t,M,y); y+=5; });
+    if(isSurvey()){
+      y+=1; doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor(20); doc.text(T('pdf_rec'),M,y); y+=5; doc.setFont('helvetica','normal');
+      doc.splitTextToSize(it.recommendation||'—',W-2*M).forEach(t=>{ ck(6); doc.text(t,M,y); y+=5; });
+      fld(T('pdf_cost'), it.cost? fmtCost(parseCost(it.cost)) : '—');
+      if(it.life) fld(T('pdf_life'), it.life);
+    }
     if(it.history&&it.history.length){ y+=1; doc.setFont('helvetica','italic'); doc.setFontSize(8); doc.setTextColor(110); doc.text('Status history:',M,y); y+=4;
       it.history.forEach(h=>{ ck(5); doc.text(`• ${h.ts}: ${h.from} → ${h.to}`,M+3,y); y+=4; }); doc.setTextColor(20); }
     y+=2;
@@ -1006,7 +1165,7 @@ async function exportPDF(){
     (pl.rooms||[]).forEach(r=>{ doc.setTextColor(20,120,60); doc.text(r.name||'room', ox+r.fx*dw, oy+r.fy*dh, {align:'center'}); });
     // pins
     pinned.forEach(it=>{ const px=ox+it.planRef.fx*dw, py=oy+it.planRef.fy*dh;
-      const col=it.status==='defect'?[239,68,68]:it.status==='incomplete'?[245,158,11]:it.status==='complete'?[34,197,94]:[255,122,24];
+      const col=ratingRGB(it);
       doc.setFillColor(col[0],col[1],col[2]); doc.circle(px,py,3.2,'F');
       doc.setTextColor(255); doc.setFont('helvetica','bold'); doc.setFontSize(6);
       doc.text(String(it.snag).padStart(2,'0'),px,py+1.2,{align:'center'}); });
@@ -1047,11 +1206,16 @@ window.addEventListener('load',()=>{ const cv=document.getElementById('acanvas')
   }
 });
 window.addEventListener('beforeunload',()=>{ saveCurrentToStore(); persistStore(); });
+// On mobile, beforeunload is unreliable; persist when the page is hidden/backgrounded too.
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden'){ saveCurrentToStore(); persistStore(); } });
+window.addEventListener('pagehide',()=>{ saveCurrentToStore(); persistStore(); });
 
 /* ================= init ================= */
-loadStore(); applyLang(); loadCurrentFromStore();
-if(items.length===0){ addItem(); } else { render(); }
-renderInspSelector();
+(async ()=>{
+  await loadStore(); applyLang(); loadCurrentFromStore();
+  if(items.length===0){ addItem(); } else { render(); }
+  renderInspSelector();
+})();
 </script>
 </body>
 </html>
