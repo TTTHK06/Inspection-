@@ -154,6 +154,7 @@
   .modal.on{display:flex;}
   .modal-canvas-wrap{flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden;}
   .modal canvas{max-width:100%; max-height:100%; touch-action:none; border:1px solid var(--line); border-radius:8px;}
+  .modal video{max-width:100%; max-height:100%; border:1px solid var(--line); border-radius:8px; background:#000;}
   .modal-tools{display:flex; gap:8px; padding:12px 0; flex-wrap:wrap; justify-content:center;}
   .modal-tools button{border:1px solid var(--line); background:var(--panel); color:var(--ink); border-radius:8px; padding:11px 14px; font:inherit; font-size:12px; cursor:pointer; text-transform:uppercase; letter-spacing:.5px;}
   .modal-tools button.prim{background:var(--accent); color:#1a1209; border-color:var(--accent);}
@@ -314,6 +315,16 @@
   </div>
 </div>
 
+<!-- in-app camera (getUserMedia) — robust across Chrome / Samsung Internet, https only -->
+<div class="modal" id="cam">
+  <div class="modal-canvas-wrap"><video id="camVideo" autoplay playsinline muted></video></div>
+  <div class="modal-tools">
+    <button onclick="flipCam()" id="cam_flip">Flip</button>
+    <button class="prim" onclick="shootCam()" id="cam_shoot">Capture</button>
+    <button onclick="closeCam()" id="cam_close">Close</button>
+  </div>
+</div>
+
 <script>
 /* ================= i18n ================= */
 const I18N={
@@ -326,6 +337,7 @@ const I18N={
     closed:'Closed Items',complete:'Complete',incomplete:'Incomplete',defect:'Defect',
     loc:'Location / Area',trade:'Trade / Discipline',priority:'Priority',notes:'Notes',
     dictate:'Dictate',stop:'Stop',photos:'Photos',camera:'Camera',gallery:'Gallery',
+    cam_flip:'Flip',cam_shoot:'Capture',cam_close:'Close',
     markup:'Mark up',capgps:'Capture GPS',update:'Update',logged:'Logged',
     recmemo:'Record memo',stopmemo:'Stop',autosave:'Auto-saving to this browser. Backup regularly.',
     dupitem:'Duplicate item',reinspect:'Re-inspect',
@@ -352,6 +364,7 @@ const I18N={
     closed:'Voltooide Items',complete:'Voltooi',incomplete:'Onvoltooi',defect:'Gebrek',
     loc:'Ligging / Area',trade:'Vakgebied',priority:'Prioriteit',notes:'Notas',
     dictate:'Dikteer',stop:'Stop',photos:'Foto\u2019s',camera:'Kamera',gallery:'Galery',
+    cam_flip:'Wissel',cam_shoot:'Neem',cam_close:'Sluit',
     markup:'Merk',capgps:'Kry GPS',update:'Werk by',logged:'Gelog',
     recmemo:'Neem memo op',stopmemo:'Stop',autosave:'Outomaties gestoor in hierdie blaaier. Rugsteun gereeld.',
     dupitem:'Dupliseer item',reinspect:'Herinspeksie',
@@ -388,6 +401,7 @@ function applyLang(){
   const ri=document.getElementById('t_reinspect'); if(ri) ri.textContent=T('reinspect');
   set('t_plan_h','plan_h');set('t_planimport','planimport');set('t_planrename','planrename');set('t_plandel','plandel');
   set('t_pmpin','pmpin');set('t_pmroom','pmroom');set('t_pmzone','pmzone');
+  set('cam_flip','cam_flip');set('cam_shoot','cam_shoot');set('cam_close','cam_close');
   const h=document.getElementById('hint'); if(!h.dataset.flashing) h.textContent=T('autosave');
 }
 function toggleLang(){ lang = lang==='en'?'af':'en'; localStorage.setItem('snag_lang',lang); applyLang(); render(); }
@@ -831,6 +845,36 @@ function compress(file,max,q,cb){ const r=new FileReader(); r.onload=ev=>{ const
   if(w>h&&w>max){h=h*max/w;w=max;}else if(h>=w&&h>max){w=w*max/h;h=max;} const c=document.createElement('canvas'); c.width=w;c.height=h; c.getContext('2d').drawImage(img,0,0,w,h); cb(c.toDataURL('image/jpeg',q)); }; img.src=ev.target.result; }; r.readAsDataURL(file); }
 function delPhoto(id,idx){ const it=items.find(i=>i.id===id); if(!it) return; it.photos.splice(idx,1); touch(); render(); }
 
+/* ===== in-app camera (getUserMedia) ===== robust on Chrome/Samsung Internet over https,
+   sidesteps the flaky <input capture>. Falls back to the file picker if unavailable/denied. */
+let camStream=null, camFacing='environment', camTargetId=null;
+async function openCamera(id){
+  camTargetId=id;
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ pickPhoto(id,true); return; } // old browsers → OS picker
+  try{
+    camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:camFacing}},audio:false});
+    const v=document.getElementById('camVideo'); v.srcObject=camStream;
+    document.getElementById('cam').classList.add('on');
+  }catch(e){
+    // permission denied / no camera / not secure context → fall back to the OS file+camera picker
+    flash(lang==='af'?'Kamera nie beskikbaar — gebruik kieser.':'Camera unavailable — using picker.');
+    pickPhoto(id,true);
+  }
+}
+function stopCam(){ if(camStream){ try{ camStream.getTracks().forEach(t=>t.stop()); }catch(e){} camStream=null; } }
+function closeCam(){ stopCam(); const m=document.getElementById('cam'); if(m) m.classList.remove('on'); const v=document.getElementById('camVideo'); if(v) v.srcObject=null; camTargetId=null; }
+async function flipCam(){ camFacing=(camFacing==='environment')?'user':'environment'; stopCam();
+  try{ camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:camFacing}},audio:false}); document.getElementById('camVideo').srcObject=camStream; }
+  catch(e){ flash(lang==='af'?'Kon nie kamera wissel nie.':'Could not switch camera.'); } }
+function shootCam(){ const v=document.getElementById('camVideo'); if(!v||!v.videoWidth){ return; }
+  let w=v.videoWidth, h=v.videoHeight; const max=1280;
+  if(w>h&&w>max){h=h*max/w;w=max;}else if(h>=w&&h>max){w=w*max/h;h=max;}
+  const c=document.createElement('canvas'); c.width=w; c.height=h; c.getContext('2d').drawImage(v,0,0,w,h);
+  const data=c.toDataURL('image/jpeg',0.72);
+  const it=items.find(i=>i.id===camTargetId); if(it){ it.photos.push(data); touch(); render(); }
+  flash(lang==='af'?'Foto gestoor — neem nog, of Sluit.':'Photo captured — take more, or Close.');
+}
+
 /* ================= logo ================= */
 function pickLogo(){ const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.onchange=e=>{ const f=e.target.files[0]; if(!f) return; compress(f,400,0.85,d=>{ logoData=d; renderLogo(); touch(); }); }; openPicker(inp); }
 function clearLogo(){ logoData=null; renderLogo(); touch(); }
@@ -984,7 +1028,7 @@ function itemCard(it){
       <div class="field"><label>${T('photos')}</label>
         <div class="photos">${photoHtml}</div>
         <div class="photo-btns">
-          <button class="pbtn" onclick="pickPhoto(${js(it.id)},true)">📷 ${T('camera')}</button>
+          <button class="pbtn" onclick="openCamera(${js(it.id)})">📷 ${T('camera')}</button>
           <button class="pbtn" onclick="pickPhoto(${js(it.id)},false)">🖼 ${T('gallery')}</button>
         </div>
         <div class="gps">${gpsHtml}</div>
@@ -1208,7 +1252,7 @@ window.addEventListener('load',()=>{ const cv=document.getElementById('acanvas')
 window.addEventListener('beforeunload',()=>{ saveCurrentToStore(); persistStore(); });
 // On mobile, beforeunload is unreliable; persist when the page is hidden/backgrounded too.
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden'){ saveCurrentToStore(); persistStore(); } });
-window.addEventListener('pagehide',()=>{ saveCurrentToStore(); persistStore(); });
+window.addEventListener('pagehide',()=>{ stopCam(); saveCurrentToStore(); persistStore(); });
 
 /* ================= init ================= */
 (async ()=>{
