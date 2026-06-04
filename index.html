@@ -1496,8 +1496,9 @@ async function exportDOC(){
   const fld=(lbl,val)=>{ return val?`<div><b>${esc(lbl)}</b> ${esc(val)}</div>`:''; };
   for(const it of ordered){
     b+=`<div style="margin-top:14px;border-top:1px solid #bbb;padding-top:8px">`;
-    const tag=[it.trade,it.priority].filter(Boolean).join(' · ');
-    b+=`<div style="font-weight:bold;font-size:12pt">${esc(num(it))} — ${esc(rlabel(it))}${tag?' ['+esc(tag)+']':''}</div>`;
+    const tag=[it.trade,it.priority].filter(Boolean).join(' · '); const rl=rlabel(it);
+    const metaR=[(rl&&rl!=='—')?rl:'', tag?'['+tag+']':''].filter(Boolean).join(' ');
+    b+=`<div style="font-weight:bold;font-size:12pt">${esc(num(it))}${metaR?' — '+esc(metaR):''}</div>`;
     if(survey) b+=fld(T('pdf_asset'),it.asset);
     b+=fld(T('pdf_loc'),it.loc); if(it.room) b+=fld(T('room')+':',it.room);
     b+=fld(T('pdf_logged'),it.ts);
@@ -1601,7 +1602,8 @@ async function exportPDF(){
   for(const it of ordered){ ck(30);
     doc.setFillColor(28,33,43); doc.rect(M,y-4.5,W-2*M,7,'F'); doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(255);
     doc.text(`${T(isSurvey()?'item_no':'snag_no')} ${String(it.snag).padStart(3,'0')}`,M+2,y); doc.setTextColor(250,200,60);
-    const tag=[it.trade,it.priority].filter(Boolean).join(' · '); doc.text(`${rlabel(it)}${tag?'   ['+tag+']':''}`,W-M-2,y,{align:'right'}); y+=8; doc.setTextColor(20);
+    const tag=[it.trade,it.priority].filter(Boolean).join(' · '); const rl=rlabel(it);
+    doc.text([(rl&&rl!=='—')?rl:'', tag?'['+tag+']':''].filter(Boolean).join('   '),W-M-2,y,{align:'right'}); y+=8; doc.setTextColor(20);
     const fld=(lbl,txt)=>{ doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.text(lbl,M,y); doc.setFont('helvetica','normal'); const t=doc.splitTextToSize(txt||'—',W-M-30); doc.text(t,M+26,y); y+=5*t.length+1; };
     if(isSurvey()&&it.asset) fld(T('pdf_asset'),it.asset);
     fld(T('pdf_loc'),it.loc); fld(T('pdf_logged'),it.ts); if(it.gps) fld('GPS:',`${it.gps.lat.toFixed(5)}, ${it.gps.lng.toFixed(5)} (±${it.gps.acc} m)`);
@@ -1676,7 +1678,8 @@ async function exportPDF(){
         doc.splitTextToSize(MEP_SYMBOLS[d].name+'  —  '+codes, W-2*M).forEach(l=>{ ck(5); doc.text(l,M,y); y+=4; }); }); }
   }
 
-  if(m.inspector){ ck(34); doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20); doc.text(T('pdf_signoff'),M,y); y+=10;
+  if(m.inspector){ y+=4; if(y+40>H-20){ doc.addPage(); y=M; } else { line(y,true); y+=8; }
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20); doc.text(T('pdf_signoff'),M,y); y+=10;
     doc.setDrawColor(120); doc.setLineWidth(0.3); doc.line(M,y,M+70,y); doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(60);
     doc.text(lang==='af'?'Inspekteur (handtekening)':'Inspector (signature)',M,y+5); doc.text(`${lang==='af'?'Naam':'Name'}:  ${m.inspector}`,M,y+12); doc.text(`${lang==='af'?'Datum':'Date'}:  ${m.date||''}`,M,y+18); }
   const pages=doc.getNumberOfPages();
