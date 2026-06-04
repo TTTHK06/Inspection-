@@ -179,6 +179,22 @@
   .plan-modes{display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap;}
   .plan-modes .pm{flex:1; min-width:90px; border:1px solid var(--line); background:var(--bg); color:var(--muted); border-radius:7px; padding:8px 6px; font:inherit; font-size:11px; cursor:pointer; text-transform:uppercase; letter-spacing:.4px; text-align:center;}
   .plan-modes .pm[data-on="1"]{border-color:var(--accent); color:var(--accent2); background:rgba(255,122,24,.12);}
+  .sym-palette{border:1px solid var(--line); border-radius:8px; background:var(--bg); padding:8px; margin-bottom:10px;}
+  .sym-discs{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;}
+  .sym-disc{flex:1; min-width:74px; border:1px solid var(--line); border-radius:6px; padding:6px 4px; font-size:10px; cursor:pointer; text-transform:uppercase; letter-spacing:.4px; text-align:center; color:#fff;}
+  .sym-disc[data-on="0"]{opacity:.4;}
+  .sym-items{display:flex; gap:6px; flex-wrap:wrap;}
+  .sym-chip{display:flex; align-items:center; gap:5px; border:1px solid var(--line); background:var(--panel2); color:var(--ink); border-radius:6px; padding:6px 9px; font-size:11px; cursor:pointer;}
+  .sym-chip[data-on="1"]{border-color:var(--accent2); box-shadow:0 0 0 2px rgba(250,204,21,.25);}
+  .sym-chip .dot{width:10px; height:10px; border-radius:2px; flex:none;}
+  .symmark{position:absolute; transform:translate(-50%,-50%); z-index:2; display:flex; align-items:center; justify-content:center;
+    min-width:15px; height:12px; padding:0 2px; border-radius:3px; color:#fff; font:700 7px/1 monospace; border:1px solid rgba(0,0,0,.35); box-shadow:0 1px 2px rgba(0,0,0,.4); white-space:nowrap;}
+  .pen-tools{display:flex; gap:6px; align-items:center; flex-wrap:wrap; border:1px solid var(--line); border-radius:8px; background:var(--bg); padding:8px; margin-bottom:10px;}
+  .pen-colors{display:flex; gap:6px;}
+  .pen-sw{width:26px; height:26px; border-radius:50%; border:2px solid var(--line); cursor:pointer; padding:0;}
+  .pen-sw[data-on="1"]{border-color:var(--accent2); box-shadow:0 0 0 2px rgba(250,204,21,.3);}
+  .pen-tools .pen-btn{margin-left:auto; border:1px solid var(--line); background:var(--panel2); color:var(--ink); border-radius:7px; padding:8px 12px; font:inherit; font-size:12px; cursor:pointer;}
+  .pen-tools .pen-btn + .pen-btn{margin-left:6px;}
   .plan-stage{position:relative; width:100%; overflow:hidden; border:1px solid var(--line); border-radius:8px; background:#fff; height:60vh; touch-action:none;}
   .plan-zoomwrap{position:absolute; top:0; left:0; transform-origin:0 0; will-change:transform;}
   .plan-zoomwrap canvas{display:block;}
@@ -188,8 +204,8 @@
   .plan-zoombar #planZoomLbl{min-width:44px; text-align:center;}
   .plan-pan-hint{font-size:9px; color:var(--na); letter-spacing:.3px;}
   .pin{position:absolute; transform:translate(-50%,-100%); cursor:pointer; font-size:0; z-index:2;}
-  .pin svg{width:26px; height:34px; filter:drop-shadow(0 1px 2px rgba(0,0,0,.5));}
-  .pin span{position:absolute; top:5px; left:50%; transform:translateX(-50%); color:#fff; font:700 10px/1 monospace;}
+  .pin svg{width:17px; height:22px; filter:drop-shadow(0 1px 2px rgba(0,0,0,.5));}
+  .pin span{position:absolute; top:3px; left:50%; transform:translateX(-50%); color:#fff; font:700 7px/1 monospace;}
   .roommark{position:absolute; transform:translate(-50%,-50%); background:rgba(34,197,94,.9); color:#04210f; font:700 9px/1 monospace; padding:3px 6px; border-radius:10px; z-index:1; white-space:nowrap; pointer-events:none;}
   .roombox{position:absolute; border:2px solid rgba(34,197,94,.9); background:rgba(34,197,94,.12); z-index:0;}
   .roombox span{position:absolute; top:-9px; left:4px; background:rgba(34,197,94,.95); color:#04210f; font:700 9px/1 monospace; padding:2px 5px; border-radius:4px;}
@@ -271,8 +287,19 @@
       </div>
       <div class="plan-modes" id="planModes">
         <div class="pm" data-mode="pin" data-on="1" onclick="setPlanMode('pin')" id="t_pmpin">Pin snag</div>
+        <div class="pm" data-mode="symbol" data-on="0" onclick="setPlanMode('symbol')" id="t_pmsym">MEP symbol</div>
+        <div class="pm" data-mode="draw" data-on="0" onclick="setPlanMode('draw')" id="t_pmdraw">Pen</div>
         <div class="pm" data-mode="room" data-on="0" onclick="setPlanMode('room')" id="t_pmroom">Mark room</div>
         <div class="pm" data-mode="zone" data-on="0" onclick="setPlanMode('zone')" id="t_pmzone">Draw room</div>
+      </div>
+      <div class="sym-palette" id="symPalette" style="display:none;">
+        <div class="sym-discs" id="symDiscs"></div>
+        <div class="sym-items" id="symItems"></div>
+      </div>
+      <div class="pen-tools" id="penTools" style="display:none;">
+        <div class="pen-colors" id="penColors"></div>
+        <button class="pen-btn" onclick="undoDraw()" id="t_penundo">Undo</button>
+        <button class="pen-btn" onclick="clearDraws()" id="t_penclear">Clear</button>
       </div>
       <div class="plan-zoombar">
         <button onclick="planZoom(-1)">−</button>
@@ -367,7 +394,8 @@ const I18N={
     recmemo:'Record memo',stopmemo:'Stop',autosave:'Auto-saving to this browser. Backup regularly.',
     dupitem:'Duplicate item',reinspect:'Re-inspect',
     plan_h:'Plan / Drawing',planimport:'Import PDF Plan',planrename:'Rename',plandel:'✕ Page',
-    pmpin:'Pin snag',pmroom:'Mark room',pmzone:'Draw room',room:'Room',planlink:'Plan',nolink:'Not on plan',
+    pmpin:'Pin snag',pmsym:'MEP symbol',pmdraw:'Pen',pmroom:'Mark room',pmzone:'Draw room',room:'Room',planlink:'Plan',nolink:'Not on plan',
+    disc_hvac:'HVAC',disc_wet:'Wet',disc_drain:'Drainage',disc_fire:'Fire',penundo:'Undo',penclear:'Clear',
     pdf_title:'INSPECTION SNAG LIST',pdf_sub:'Works completed — site inspection record',
     pdf_summary:'Outstanding Items Summary',pdf_detail:'Inspection Detail',pdf_signoff:'Sign-off',
     pdf_loc:'Location:',pdf_logged:'Logged:',pdf_notes:'Notes:',
@@ -395,7 +423,8 @@ const I18N={
     recmemo:'Neem memo op',stopmemo:'Stop',autosave:'Outomaties gestoor in hierdie blaaier. Rugsteun gereeld.',
     dupitem:'Dupliseer item',reinspect:'Herinspeksie',
     plan_h:'Plan / Tekening',planimport:'Voer PDF-plan in',planrename:'Hernoem',plandel:'✕ Bladsy',
-    pmpin:'Pen fout',pmroom:'Merk kamer',pmzone:'Teken kamer',room:'Kamer',planlink:'Plan',nolink:'Nie op plan',
+    pmpin:'Pen fout',pmsym:'MEP simbool',pmdraw:'Pen',pmroom:'Merk kamer',pmzone:'Teken kamer',room:'Kamer',planlink:'Plan',nolink:'Nie op plan',
+    disc_hvac:'HVAC',disc_wet:'Nat',disc_drain:'Riolering',disc_fire:'Brand',penundo:'Ontdoen',penclear:'Vee uit',
     pdf_title:'INSPEKSIE FOUTLYS',pdf_sub:'Werk voltooi — terrein-inspeksierekord',
     pdf_summary:'Uitstaande Items Opsomming',pdf_detail:'Inspeksiebesonderhede',pdf_signoff:'Goedkeuring',
     pdf_loc:'Ligging:',pdf_logged:'Gelog:',pdf_notes:'Notas:',
@@ -426,7 +455,10 @@ function applyLang(){
   set('t_new','new');set('t_dup','dup');set('t_delinsp','delinsp');
   const ri=document.getElementById('t_reinspect'); if(ri) ri.textContent=T('reinspect');
   set('t_plan_h','plan_h');set('t_planimport','planimport');set('t_planrename','planrename');set('t_plandel','plandel');
-  set('t_pmpin','pmpin');set('t_pmroom','pmroom');set('t_pmzone','pmzone');
+  set('t_pmpin','pmpin');set('t_pmsym','pmsym');set('t_pmdraw','pmdraw');set('t_pmroom','pmroom');set('t_pmzone','pmzone');
+  set('t_penundo','penundo');set('t_penclear','penclear');
+  if(planMode==='symbol') renderSymbolPalette();
+  if(planMode==='draw') renderPenColors();
   set('cam_flip','cam_flip');set('cam_shoot','cam_shoot');set('cam_close','cam_close');
   set('t_word','word');set('t_phrases','phrases');set('t_phradd','phradd');set('t_phrclose','phrclose');
   { const pn=document.getElementById('phraseNew'); if(pn) pn.placeholder=T('phrnew'); }
@@ -441,9 +473,32 @@ let store={inspections:{},order:[],current:null};
 let items=[], seq=0, logoData=null;
 let plans=[];            // [{id,name,img(dataURL),w,h,rooms:[{name,fx,fy}],zones:[{name,fx,fy,fw,fh}]}]
 let curPlanPage=-1;      // index into plans, -1 = none
-let planMode='pin';      // 'pin' | 'room' | 'zone'
+let planMode='pin';      // 'pin' | 'symbol' | 'room' | 'zone'
 let zoneDraft=null;      // in-progress zone box while dragging
 let activeFilters={status:new Set(),trade:new Set(),priority:new Set()};
+
+/* ===== standard mechanical-services symbols for plan markup ===== */
+const MEP_SYMBOLS={
+  hvac:{ name:'HVAC', color:'#2563eb', items:[
+    {k:'AHU',l:'Air handling unit'},{k:'FCU',l:'Fan coil unit'},{k:'FAN',l:'Fan'},{k:'DIF',l:'Diffuser / grille'},
+    {k:'CHL',l:'Chiller'},{k:'CDU',l:'Condenser / split unit'},{k:'VAV',l:'VAV box'},{k:'TST',l:'Thermostat'}]},
+  wet:{ name:'Wet Services', color:'#0891b2', items:[
+    {k:'VLV',l:'Isolating valve'},{k:'TAP',l:'Tap / outlet'},{k:'CAL',l:'Calorifier / cylinder'},{k:'PMP',l:'Pump'},
+    {k:'TNK',l:'Water tank'},{k:'WM',l:'Water meter'},{k:'WH',l:'Water heater'}]},
+  drain:{ name:'Drainage', color:'#b45309', items:[
+    {k:'GUL',l:'Gully'},{k:'IC',l:'Inspection chamber'},{k:'FD',l:'Floor drain'},{k:'VP',l:'Vent pipe'},
+    {k:'RE',l:'Rodding eye'},{k:'SVP',l:'Soil & vent pipe'}]},
+  fire:{ name:'Fire', color:'#dc2626', items:[
+    {k:'HYD',l:'Hydrant'},{k:'HR',l:'Hose reel'},{k:'SPR',l:'Sprinkler'},{k:'FE',l:'Fire extinguisher'},
+    {k:'DET',l:'Detector'},{k:'FAP',l:'Alarm panel'},{k:'RIS',l:'Riser'}]}
+};
+let symbolDisc='hvac';   // active discipline tab in the palette
+let symbolSel=null;      // {disc,k} currently selected symbol to place
+function symColor(disc){ return (MEP_SYMBOLS[disc]&&MEP_SYMBOLS[disc].color)||'#64748b'; }
+
+/* ===== freehand pen markup ===== */
+const PEN_COLORS=['#ef4444','#facc15','#22c55e','#2563eb','#111111'];
+let penColor='#ef4444', penWidth=2.4, drawStroke=null;   // drawStroke = in-progress {c,w,pts:[{fx,fy}]}
 
 const TRADES=['HVAC','Wet Services','Fire','General/Other'];
 const PRIORITIES=['Critical','Minor'];
@@ -532,10 +587,10 @@ function applySnapshotToForm(d){
   setVal('f_firm',m.firm);setVal('f_details',m.details);setVal('p_name',m.name);setVal('p_no',m.no);
   setVal('p_client',m.client);setVal('p_addr',m.addr);setVal('p_inspector',m.inspector);
   setVal('p_date',m.date||new Date().toISOString().slice(0,10));setVal('p_weather',m.weather);
-  items=(d.items||[]).map(it=>Object.assign({trade:'',priority:'',gps:null,history:[],snag:0,audio:null,room:'',planRef:null,condition:'',recommendation:'',cost:'',asset:'',life:''},it));
+  items=(d.items||[]).map(it=>Object.assign({trade:'',priority:'',gps:null,history:[],snag:0,audio:null,room:'',planRef:null,condition:'',recommendation:'',asset:'',life:''},it));
   seq=d.seq || items.reduce((mx,i)=>Math.max(mx,i.snag||0),0);
   logoData=d.logo||null; renderLogo();
-  plans=(d.plans||[]).map(p=>Object.assign({id:'',name:'',img:'',w:0,h:0,rooms:[],zones:[]},p));
+  plans=(d.plans||[]).map(p=>Object.assign({id:'',name:'',img:'',w:0,h:0,rooms:[],zones:[],symbols:[],draws:[]},p));
   curPlanPage = plans.length?0:-1; renderPlanPanel();
   updateModeBar(); applyLang();
 }
@@ -559,7 +614,7 @@ function deleteInspection(){
 /* ================= items ================= */
 function addItem(data){
   if(data){ items.push(data); }
-  else{ seq++; items.push({id:uid(),snag:seq,loc:'',asset:'',life:'',status:'',condition:'',recommendation:'',cost:'',trade:'',priority:'',notes:'',photos:[],audio:null,gps:null,ts:nowStamp(),history:[]}); }
+  else{ seq++; items.push({id:uid(),snag:seq,loc:'',asset:'',life:'',status:'',condition:'',recommendation:'',trade:'',priority:'',notes:'',photos:[],audio:null,gps:null,ts:nowStamp(),history:[]}); }
   touch(); render();
 }
 function delItem(id){ if(!confirm(lang==='af'?'Skrap hierdie item?':'Delete this item?')) return; items=items.filter(i=>i.id!==id); touch(); render(); }
@@ -695,12 +750,43 @@ async function loadPlanFromFile(f){
   flash(lang==='af'?`${added.length} bladsy(e) ingevoer.`:`${added.length} page(s) imported.`);
 }
 
-function setPlanMode(m){ planMode=m; document.querySelectorAll('#planModes .pm').forEach(el=>el.dataset.on=(el.dataset.mode===m)?'1':'0'); updatePlanHint(); }
+function setPlanMode(m){ planMode=m; document.querySelectorAll('#planModes .pm').forEach(el=>el.dataset.on=(el.dataset.mode===m)?'1':'0');
+  const pal=document.getElementById('symPalette'); if(pal){ pal.style.display=(m==='symbol')?'block':'none'; if(m==='symbol') renderSymbolPalette(); }
+  const pt=document.getElementById('penTools'); if(pt){ pt.style.display=(m==='draw')?'flex':'none'; if(m==='draw') renderPenColors(); }
+  updatePlanHint(); }
 function updatePlanHint(){ const h=document.getElementById('planHint'); if(!h) return;
   const hints={ pin:(lang==='af'?'Tik op die plan om \u2019n fout te pen.':'Tap the plan to drop a snag pin.'),
+    symbol:(lang==='af'?'Kies \u2019n simbool, tik dan op die plan. Tik \u2019n simbool om te verwyder.':'Pick a symbol, then tap the plan to place it. Tap a symbol to remove it.'),
+    draw:(lang==='af'?'Sleep om vry te teken. Knyp om in te zoem vir presisie.':'Drag to draw freehand. Pinch to zoom in for precision.'),
     room:(lang==='af'?'Tik om \u2019n kamermerker te plaas; tik naam in.':'Tap to place a room marker, then name it.'),
     zone:(lang==='af'?'Sleep om \u2019n kamerblok te teken.':'Drag to draw a room box.') };
   h.textContent=hints[planMode]||''; }
+function renderPenColors(){ const el=document.getElementById('penColors'); if(!el) return;
+  el.innerHTML=PEN_COLORS.map(c=>`<button class="pen-sw" data-on="${c===penColor?1:0}" style="background:${c}" onclick="setPenColor('${c}')"></button>`).join(''); }
+function setPenColor(c){ penColor=c; renderPenColors(); }
+function undoDraw(){ const p=plans[curPlanPage]; if(!p||!(p.draws&&p.draws.length)) return; p.draws.pop(); touch(); drawPlanOverlay(); }
+function clearDraws(){ const p=plans[curPlanPage]; if(!p||!(p.draws&&p.draws.length)) return;
+  if(!confirm(lang==='af'?'Vee alle vryhand-merke op hierdie bladsy uit?':'Clear all freehand marks on this page?')) return;
+  p.draws=[]; touch(); drawPlanOverlay(); }
+function strokePath(st,W,H){ return (st.pts||[]).map((p,i)=>`${i?'L':'M'}${(p.fx*W).toFixed(1)} ${(p.fy*H).toFixed(1)}`).join(' '); }
+function updateLivePath(){ const live=document.getElementById('planLivePath'); if(!live||!drawStroke) return;
+  live.setAttribute('stroke',drawStroke.c); live.setAttribute('stroke-width',drawStroke.w);
+  live.setAttribute('d',strokePath(drawStroke,planBaseW,planBaseH)); }
+
+function renderSymbolPalette(){
+  const dEl=document.getElementById('symDiscs'), iEl=document.getElementById('symItems'); if(!dEl||!iEl) return;
+  dEl.innerHTML=Object.keys(MEP_SYMBOLS).map(d=>`<div class="sym-disc" data-on="${d===symbolDisc?1:0}" style="background:${MEP_SYMBOLS[d].color}" onclick="setSymbolDisc('${d}')">${escHtml(T('disc_'+d))}</div>`).join('');
+  const col=symColor(symbolDisc);
+  iEl.innerHTML=MEP_SYMBOLS[symbolDisc].items.map(s=>`<div class="sym-chip" data-on="${(symbolSel&&symbolSel.disc===symbolDisc&&symbolSel.k===s.k)?1:0}" onclick="selectSymbol('${symbolDisc}','${s.k}')" title="${escAttr(s.l)}"><span class="dot" style="background:${col}"></span>${s.k}</div>`).join('');
+}
+function setSymbolDisc(d){ symbolDisc=d; renderSymbolPalette(); }
+function selectSymbol(disc,k){ symbolSel={disc,k}; renderSymbolPalette(); updatePlanHint(); }
+function symLabel(disc,k){ const g=MEP_SYMBOLS[disc]; if(!g) return k; const it=g.items.find(x=>x.k===k); return it?it.l:k; }
+function placeSymbol(fx,fy){ const p=plans[curPlanPage]; if(!p) return;
+  if(!symbolSel){ flash(lang==='af'?'Kies eers \u2019n simbool.':'Pick a symbol first.'); return; }
+  if(!p.symbols) p.symbols=[];
+  p.symbols.push({disc:symbolSel.disc,k:symbolSel.k,fx,fy}); touch(); drawPlanOverlay();
+  flash((MEP_SYMBOLS[symbolSel.disc].name)+' \u00b7 '+symbolSel.k); }
 
 function renamePlanPage(){ if(curPlanPage<0) return; const p=plans[curPlanPage];
   const v=prompt(lang==='af'?'Bladsynaam:':'Page name:',p.name); if(v!=null){ p.name=v.trim()||p.name; touch(); renderPlanPanel(); } }
@@ -761,11 +847,26 @@ function renderPlanPanel(){
 function drawPlanOverlay(){
   const p=plans[curPlanPage]; const ov=document.getElementById('planOverlay'); if(!ov||!p) return;
   ov.innerHTML='';
+  // freehand strokes (under markers): SVG sized to the base plan, scales with the zoom transform
+  const NS='http://www.w3.org/2000/svg';
+  const svg=document.createElementNS(NS,'svg'); svg.setAttribute('id','planDrawSvg');
+  svg.setAttribute('width',planBaseW); svg.setAttribute('height',planBaseH);
+  svg.setAttribute('viewBox','0 0 '+planBaseW+' '+planBaseH);
+  svg.style.position='absolute'; svg.style.left='0'; svg.style.top='0'; svg.style.pointerEvents='none'; svg.style.zIndex='1';
+  (p.draws||[]).forEach(st=>{ const path=document.createElementNS(NS,'path'); path.setAttribute('d',strokePath(st,planBaseW,planBaseH));
+    path.setAttribute('fill','none'); path.setAttribute('stroke',st.c||'#ef4444'); path.setAttribute('stroke-width',st.w||2.4);
+    path.setAttribute('stroke-linecap','round'); path.setAttribute('stroke-linejoin','round'); svg.appendChild(path); });
+  const live=document.createElementNS(NS,'path'); live.setAttribute('id','planLivePath'); live.setAttribute('fill','none');
+  live.setAttribute('stroke-linecap','round'); live.setAttribute('stroke-linejoin','round'); svg.appendChild(live);
+  ov.appendChild(svg);
   (p.zones||[]).forEach(z=>{ const b=document.createElement('div'); b.className='roombox';
     b.style.left=(z.fx*100)+'%'; b.style.top=(z.fy*100)+'%'; b.style.width=(z.fw*100)+'%'; b.style.height=(z.fh*100)+'%';
     b.innerHTML=`<span>${escHtml(z.name||'room')}</span>`; ov.appendChild(b); });
   (p.rooms||[]).forEach(r=>{ const m=document.createElement('div'); m.className='roommark';
     m.style.left=(r.fx*100)+'%'; m.style.top=(r.fy*100)+'%'; m.textContent=r.name||'room'; ov.appendChild(m); });
+  (p.symbols||[]).forEach(s=>{ const el=document.createElement('div'); el.className='symmark';
+    el.style.left=(s.fx*100)+'%'; el.style.top=(s.fy*100)+'%'; el.style.background=symColor(s.disc);
+    el.textContent=s.k; el.title=symLabel(s.disc,s.k); ov.appendChild(el); });
   items.filter(it=>it.planRef&&it.planRef.planId===p.id).forEach(it=>{
     const pin=document.createElement('div'); pin.className='pin';
     pin.style.left=(it.planRef.fx*100)+'%'; pin.style.top=(it.planRef.fy*100)+'%';
@@ -809,6 +910,7 @@ function planPointerDown(ev){
   const t=(ev.touches&&ev.touches[0])||ev;
   ptrDown=true; ptrMoved=false; ptrStartX=t.clientX; ptrStartY=t.clientY; panStartTx=planTx; panStartTy=planTy;
   if(planMode==='zone'){ zoneStartF=planRelFraction(t.clientX,t.clientY); }
+  if(planMode==='draw'){ const f=planRelFraction(t.clientX,t.clientY); drawStroke={c:penColor,w:penWidth,pts:[f]}; updateLivePath(); }
 }
 function planPointerMove(ev){
   if(curPlanPage<0) return;
@@ -824,32 +926,45 @@ function planPointerMove(ev){
   const t=(ev.touches&&ev.touches[0])||ev;
   const dx=t.clientX-ptrStartX, dy=t.clientY-ptrStartY;
   if(Math.abs(dx)>6||Math.abs(dy)>6) ptrMoved=true;
+  if(planMode==='draw' && drawStroke){ ev.preventDefault();
+    const f=planRelFraction(t.clientX,t.clientY); drawStroke.pts.push(f); updateLivePath(); return; }
   if(planMode==='zone' && zoneStartF){ ev.preventDefault();
     const c=planRelFraction(t.clientX,t.clientY);
     zoneDraft={fx:Math.min(zoneStartF.fx,c.fx),fy:Math.min(zoneStartF.fy,c.fy),fw:Math.abs(c.fx-zoneStartF.fx),fh:Math.abs(c.fy-zoneStartF.fy)};
     drawPlanOverlay(); const ov=document.getElementById('planOverlay'); const b=document.createElement('div'); b.className='roombox';
     b.style.left=(zoneDraft.fx*100)+'%'; b.style.top=(zoneDraft.fy*100)+'%'; b.style.width=(zoneDraft.fw*100)+'%'; b.style.height=(zoneDraft.fh*100)+'%'; ov.appendChild(b);
     return; }
-  // pan (pin/room modes): drag moves the view
+  // pan (pin/room/symbol modes): drag moves the view
   if(ptrMoved){ ev.preventDefault(); planTx=panStartTx+dx; planTy=panStartTy+dy; clampPan(); applyPlanTransform(); }
 }
 function planPointerUp(ev){
   if(curPlanPage<0) return;
   if(ev.touches&&ev.touches.length>=1){ pinchD0=0; }   // a finger lifted from pinch
+  if(planMode==='draw' && drawStroke){
+    const p=plans[curPlanPage]; if(drawStroke.pts.length>1){ if(!p.draws) p.draws=[]; p.draws.push(drawStroke); touch(); }
+    drawStroke=null; drawPlanOverlay(); ptrDown=false; ptrMoved=false; return;
+  }
   if(planMode==='zone' && zoneStartF){
     const p=plans[curPlanPage];
     if(zoneDraft&&zoneDraft.fw>0.02&&zoneDraft.fh>0.02){ const name=prompt(lang==='af'?'Kamernaam:':'Room name:',''); if(name&&name.trim()){ p.zones.push(Object.assign({name:name.trim()},zoneDraft)); touch(); } }
     zoneStartF=null; zoneDraft=null; drawPlanOverlay(); renderRoomList(); ptrDown=false; return;
   }
   if(ptrDown && !ptrMoved){
-    // genuine tap -> place pin/room at that point, or jump to a pin if one is tapped
+    // genuine tap -> place pin/room/symbol at that point, or hit an existing marker
     const t=(ev.changedTouches&&ev.changedTouches[0])||ev;
     const {fx,fy}=planRelFraction(t.clientX,t.clientY);
-    // if tapping near an existing pin, jump to it instead of creating
     const p=plans[curPlanPage];
-    const hit=items.find(it=>it.planRef&&it.planRef.planId===p.id && Math.hypot(it.planRef.fx-fx,it.planRef.fy-fy)<0.025);
-    if(hit){ const el=document.getElementById('notes_'+hit.id); if(el) el.scrollIntoView({behavior:'smooth',block:'center'}); flash('SNAG '+String(hit.snag).padStart(3,'0')); }
-    else placePin(fx,fy);
+    if(planMode==='symbol'){
+      // tap an existing symbol to remove it; otherwise drop the selected symbol
+      const si=(p.symbols||[]).findIndex(s=>Math.hypot(s.fx-fx,s.fy-fy)<0.025);
+      if(si>=0){ const removed=p.symbols[si]; p.symbols.splice(si,1); touch(); drawPlanOverlay(); flash((lang==='af'?'Verwyder: ':'Removed: ')+removed.k); }
+      else placeSymbol(fx,fy);
+    } else {
+      // if tapping near an existing pin, jump to it instead of creating
+      const hit=items.find(it=>it.planRef&&it.planRef.planId===p.id && Math.hypot(it.planRef.fx-fx,it.planRef.fy-fy)<0.025);
+      if(hit){ const el=document.getElementById('notes_'+hit.id); if(el) el.scrollIntoView({behavior:'smooth',block:'center'}); flash(T(isSurvey()?'item_no':'snag_no')+' '+String(hit.snag).padStart(3,'0')); }
+      else placePin(fx,fy);
+    }
   }
   ptrDown=false; ptrMoved=false;
 }
@@ -1073,10 +1188,7 @@ function itemCard(it){
     ? `<div class="field"><div class="notes-head"><label>${T('recommendation')}</label>
          <button class="mic" onclick="openPhrases(${js(it.id)},'recommendation')">📋 ${T('phrases')}</button></div>
          <textarea oninput="bind(${js(it.id)},'recommendation',this)" placeholder="...">${escHtml(it.recommendation||'')}</textarea></div>
-       <div class="grid2">
-         <div class="field"><label>${T('cost')}</label><input value="${escAttr(it.cost||'')}" oninput="bind(${js(it.id)},'cost',this)" placeholder="e.g. 15000" inputmode="decimal"></div>
-         <div class="field"><label>${T('life')}</label><input value="${escAttr(it.life||'')}" oninput="bind(${js(it.id)},'life',this)" placeholder="e.g. ~2 yrs"></div>
-       </div>`
+       <div class="field"><label>${T('life')}</label><input value="${escAttr(it.life||'')}" oninput="bind(${js(it.id)},'life',this)" placeholder="e.g. ~2 yrs"></div>`
     : '';
   div.innerHTML=`
     <div class="item-head">
@@ -1166,10 +1278,10 @@ function csvCell(v){ v=(v==null?'':String(v)); return /[",\n]/.test(v)?'"'+v.rep
 function exportCSV(){ saveCurrentToStore(); const m=meta();
   const cgrade=c=> c==='ni'?'N/I':(c||'');
   const head = isSurvey()
-    ? ['Item','Condition','System','Asset','Location','Observations','Recommendation','Timeframe','Est. Cost','Remaining Life','GPS Lat','GPS Lng','Logged']
+    ? ['Item','Condition','System','Asset','Location','Observations','Recommendation','Timeframe','Remaining Life','GPS Lat','GPS Lng','Logged']
     : ['Snag','Status','Trade','Priority','Location','Notes','GPS Lat','GPS Lng','Logged'];
   const rows=[...items].sort((a,b)=>a.snag-b.snag).map(it=> isSurvey()
-    ? [String(it.snag).padStart(3,'0'),cgrade(it.condition),it.trade||'',it.asset||'',it.loc||'',it.notes||'',it.recommendation||'',it.priority||'',it.cost||'',it.life||'',
+    ? [String(it.snag).padStart(3,'0'),cgrade(it.condition),it.trade||'',it.asset||'',it.loc||'',it.notes||'',it.recommendation||'',it.priority||'',it.life||'',
        it.gps?it.gps.lat.toFixed(6):'',it.gps?it.gps.lng.toFixed(6):'',it.ts||'']
     : [String(it.snag).padStart(3,'0'),it.status||'',it.trade||'',it.priority||'',it.loc||'',it.notes||'',
        it.gps?it.gps.lat.toFixed(6):'',it.gps?it.gps.lng.toFixed(6):'',it.ts||'']);
@@ -1185,8 +1297,6 @@ function exportDOC(){
   const m=meta(); const survey=isSurvey(); const L=I18N[lang];
   const esc=s=>(s==null?'':String(s)).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
   const nl2br=s=>esc(s).replace(/\n/g,'<br>');
-  const parseCost=c=>{const n=parseFloat(String(c==null?'':c).replace(/[^0-9.]/g,''));return isFinite(n)?n:0;};
-  const fmtCost=n=>'R '+Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,' ');
   const sl={complete:T('complete'),incomplete:T('incomplete'),defect:T('defect')};
   const rlabel=it=> survey ? (it.condition?T('cond_'+it.condition):'—') : (sl[it.status]||'—');
   const num=it=>`${T(survey?'item_no':'snag_no')} ${String(it.snag).padStart(3,'0')}`;
@@ -1209,14 +1319,13 @@ function exportDOC(){
   const ordered=[...items].sort((a,b)=>a.snag-b.snag);
   // summary
   if(survey){
-    const counts=CONDITIONS.reduce((o,c)=>(o[c]=0,o),{}); let total=0;
-    items.forEach(it=>{ if(it.condition&&counts[it.condition]!=null)counts[it.condition]++; total+=parseCost(it.cost); });
+    const counts=CONDITIONS.reduce((o,c)=>(o[c]=0,o),{});
+    items.forEach(it=>{ if(it.condition&&counts[it.condition]!=null)counts[it.condition]++; });
     b+=`<h2 style="font-size:13pt">${esc(T('pdf_summary_survey'))}</h2>`;
     b+=`<p>`+CONDITIONS.map(c=>`${esc(T('cond_'+c))}: <b>${counts[c]}</b>`).join(' &nbsp;&nbsp; ')+`</p>`;
-    b+=`<p style="font-size:12pt"><b>${esc(T('pdf_total'))}: ${fmtCost(total)}</b></p>`;
     const action=items.filter(i=>i.condition==='C'||i.condition==='D').sort((a,b)=>a.snag-b.snag);
-    if(action.length){ b+=`<table style="border-collapse:collapse;width:100%"><tr><th style="${TH}">${esc(T('item_no'))}</th><th style="${TH}">${esc(T('condition'))}</th><th style="${TH}">${esc(T('system'))}</th><th style="${TH}">${esc(T('loc'))}</th><th style="${TH}">${esc(T('cost'))}</th></tr>`;
-      action.forEach(it=>b+=`<tr><td style="${TD}">${String(it.snag).padStart(3,'0')}</td><td style="${TD}">${esc(rlabel(it))}</td><td style="${TD}">${esc(it.trade)}</td><td style="${TD}">${esc(it.loc)}</td><td style="${TD}">${it.cost?fmtCost(parseCost(it.cost)):'—'}</td></tr>`);
+    if(action.length){ b+=`<table style="border-collapse:collapse;width:100%"><tr><th style="${TH}">${esc(T('item_no'))}</th><th style="${TH}">${esc(T('condition'))}</th><th style="${TH}">${esc(T('system'))}</th><th style="${TH}">${esc(T('loc'))}</th></tr>`;
+      action.forEach(it=>b+=`<tr><td style="${TD}">${String(it.snag).padStart(3,'0')}</td><td style="${TD}">${esc(rlabel(it))}</td><td style="${TD}">${esc(it.trade)}</td><td style="${TD}">${esc(it.loc)}</td></tr>`);
       b+=`</table>`; }
   } else {
     const flagged=items.filter(i=>i.status==='defect'||i.status==='incomplete').sort((a,b)=>a.snag-b.snag);
@@ -1238,7 +1347,7 @@ function exportDOC(){
     if(it.gps) b+=fld('GPS:',`${it.gps.lat.toFixed(5)}, ${it.gps.lng.toFixed(5)} (±${it.gps.acc} m)`);
     b+=`<div style="margin-top:4px"><b>${esc(T(survey?'pdf_obs':'pdf_notes'))}</b><br>${nl2br(it.notes||'—')}</div>`;
     if(survey){ b+=`<div style="margin-top:4px"><b>${esc(T('pdf_rec'))}</b><br>${nl2br(it.recommendation||'—')}</div>`;
-      b+=fld(T('pdf_cost'), it.cost?fmtCost(parseCost(it.cost)):''); if(it.life) b+=fld(T('pdf_life'),it.life); }
+      if(it.life) b+=fld(T('pdf_life'),it.life); }
     if(it.photos&&it.photos.length){ b+=`<div style="margin-top:6px">`; it.photos.forEach(p=>b+=`<img src="${p}" style="width:45%;margin:2px;border:1px solid #ccc">`); b+=`</div>`; }
     b+=`</div>`;
   });
@@ -1284,25 +1393,22 @@ async function exportPDF(){
   y+=1; line(y); y+=8;
   const sl={complete:T('complete').toUpperCase(),incomplete:T('incomplete').toUpperCase(),defect:T('defect').toUpperCase(),'':'—'};
   const rlabel=(it)=> isSurvey() ? (it.condition? T('cond_'+it.condition).toUpperCase() : '—') : (sl[it.status]||'—');
-  const parseCost=(c)=>{ const n=parseFloat(String(c==null?'':c).replace(/[^0-9.]/g,'')); return isFinite(n)?n:0; };
-  const fmtCost=(n)=>'R '+Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,' ');
   let secNo=1;
   if(isSurvey()){
     // ---- Condition Summary: rating counts, total estimated cost, action items (Poor + Fair) ----
     doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20); doc.text(secNo.toFixed(1)+'  '+T('pdf_summary_survey'),M,y); y+=6; secNo++;
-    const counts=CONDITIONS.reduce((o,c)=>(o[c]=0,o),{}); let total=0;
-    items.forEach(it=>{ if(it.condition&&counts[it.condition]!=null) counts[it.condition]++; total+=parseCost(it.cost); });
+    const counts=CONDITIONS.reduce((o,c)=>(o[c]=0,o),{});
+    items.forEach(it=>{ if(it.condition&&counts[it.condition]!=null) counts[it.condition]++; });
     doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(40);
-    doc.text(CONDITIONS.map(c=>`${T('cond_'+c)}: ${counts[c]}`).join('      '),M,y); y+=6;
-    doc.setFont('helvetica','bold'); doc.text(T('pdf_total')+':  '+fmtCost(total),M,y); y+=7; doc.setFont('helvetica','normal');
+    doc.text(CONDITIONS.map(c=>`${T('cond_'+c)}: ${counts[c]}`).join('      '),M,y); y+=7;
     const action=items.filter(i=>i.condition==='C'||i.condition==='D').sort((a,b)=>a.snag-b.snag);
     if(action.length){
-      const cols=[[T('item_no'),16],[T('pdf_cond').replace(':',''),26],[T('trade'),28],[T('loc'),54],['R',30]];
+      const cols=[[T('item_no'),16],[T('pdf_cond').replace(':',''),28],[T('trade'),34],[T('loc'),100]];
       doc.setFillColor(28,33,43); doc.rect(M,y-4.5,W-2*M,7,'F'); doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(255);
       let cx=M+1.5; cols.forEach(c=>{ doc.text(String(c[0]),cx,y); cx+=c[1]; }); y+=6;
       doc.setFont('helvetica','normal'); doc.setTextColor(25);
       action.forEach((it,i)=>{ ck(7); if(i%2){ doc.setFillColor(244,245,247); doc.rect(M,y-4.2,W-2*M,6,'F'); } cx=M+1.5;
-        [String(it.snag).padStart(3,'0'),rlabel(it),it.trade||'—',it.loc||'—',it.cost?fmtCost(parseCost(it.cost)):'—'].forEach((t,j)=>{ doc.text(doc.splitTextToSize(String(t),cols[j][1]-2),cx,y); cx+=cols[j][1]; }); y+=6; });
+        [String(it.snag).padStart(3,'0'),rlabel(it),it.trade||'—',it.loc||'—'].forEach((t,j)=>{ doc.text(doc.splitTextToSize(String(t),cols[j][1]-2),cx,y); cx+=cols[j][1]; }); y+=6; });
     }
     y+=3; line(y,true); y+=8;
   } else {
@@ -1333,7 +1439,6 @@ async function exportPDF(){
     if(isSurvey()){
       y+=1; doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor(20); doc.text(T('pdf_rec'),M,y); y+=5; doc.setFont('helvetica','normal');
       doc.splitTextToSize(it.recommendation||'—',W-2*M).forEach(t=>{ ck(6); doc.text(t,M,y); y+=5; });
-      fld(T('pdf_cost'), it.cost? fmtCost(parseCost(it.cost)) : '—');
       if(it.life) fld(T('pdf_life'), it.life);
     }
     if(it.history&&it.history.length){ y+=1; doc.setFont('helvetica','italic'); doc.setFontSize(8); doc.setTextColor(110); doc.text('Status history:',M,y); y+=4;
@@ -1365,16 +1470,34 @@ async function exportPDF(){
     // room markers
     doc.setFontSize(7);
     (pl.rooms||[]).forEach(r=>{ doc.setTextColor(20,120,60); doc.text(r.name||'room', ox+r.fx*dw, oy+r.fy*dh, {align:'center'}); });
+    const hexRGB=h=>{ h=String(h).replace('#',''); return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]; };
+    // freehand strokes (drawn under symbols/pins)
+    if(doc.setLineCap) doc.setLineCap('round'); if(doc.setLineJoin) doc.setLineJoin('round');
+    (pl.draws||[]).forEach(st=>{ const pts=st.pts||[]; if(pts.length<2) return; const rgb=hexRGB(st.c||'#ef4444');
+      doc.setDrawColor(rgb[0],rgb[1],rgb[2]); doc.setLineWidth(0.5);
+      for(let i=1;i<pts.length;i++){ doc.line(ox+pts[i-1].fx*dw, oy+pts[i-1].fy*dh, ox+pts[i].fx*dw, oy+pts[i].fy*dh); } });
+    doc.setLineWidth(0.2);
+    // MEP symbols
+    (pl.symbols||[]).forEach(s=>{ const px=ox+s.fx*dw, py=oy+s.fy*dh; const rgb=hexRGB(symColor(s.disc));
+      doc.setFont('helvetica','bold'); doc.setFontSize(5.5); const bw=Math.max(4.6,doc.getTextWidth(s.k)+2.2), bh=3.6;
+      doc.setFillColor(rgb[0],rgb[1],rgb[2]); doc.roundedRect(px-bw/2,py-bh/2,bw,bh,0.6,0.6,'F');
+      doc.setTextColor(255); doc.text(s.k,px,py+0.9,{align:'center'}); });
     // pins
     pinned.forEach(it=>{ const px=ox+it.planRef.fx*dw, py=oy+it.planRef.fy*dh;
       const col=ratingRGB(it);
-      doc.setFillColor(col[0],col[1],col[2]); doc.circle(px,py,3.2,'F');
-      doc.setTextColor(255); doc.setFont('helvetica','bold'); doc.setFontSize(6);
-      doc.text(String(it.snag).padStart(2,'0'),px,py+1.2,{align:'center'}); });
+      doc.setFillColor(col[0],col[1],col[2]); doc.circle(px,py,2.5,'F');
+      doc.setTextColor(255); doc.setFont('helvetica','bold'); doc.setFontSize(5.5);
+      doc.text(String(it.snag).padStart(2,'0'),px,py+0.9,{align:'center'}); });
     y=oy+dh+6;
     if(pinned.length){ doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(90);
       const legend=pinned.sort((a,b)=>a.snag-b.snag).map(it=>`${String(it.snag).padStart(3,'0')}: ${it.room||it.loc||'—'}`).join('    ');
       doc.splitTextToSize(legend,W-2*M).forEach(l=>{ ck(5); doc.text(l,M,y); y+=4; }); }
+    // symbol legend, grouped by discipline
+    const syms=pl.symbols||[];
+    if(syms.length){ y+=1; doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(90);
+      const byDisc={}; syms.forEach(s=>{ (byDisc[s.disc]=byDisc[s.disc]||new Set()).add(s.k); });
+      Object.keys(byDisc).forEach(d=>{ const codes=[...byDisc[d]].map(k=>k+' = '+symLabel(d,k)).join(';  ');
+        doc.splitTextToSize(MEP_SYMBOLS[d].name+'  —  '+codes, W-2*M).forEach(l=>{ ck(5); doc.text(l,M,y); y+=4; }); }); }
   }
 
   if(m.inspector){ ck(34); doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20); doc.text(T('pdf_signoff'),M,y); y+=10;
