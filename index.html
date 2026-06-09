@@ -427,7 +427,7 @@ const I18N={
     rpt_included:'In report — tap to exclude',rpt_excluded:'Excluded — tap to include',rpt_tag:'✕ not in report',
     undo:'Undo',editno:'Tap to edit number',renum:'⇅ Renumber 1..N',
     rs_h:'Report sections',rs_hint:'Toggle which sections appear in the PDF / Word report.',
-    rs_summary:'Summary',rs_plans:'Plan pages',rs_photos:'Photos',rs_history:'History',rs_rmrep:'report',rs_addrep:'report',
+    rs_summary:'Summary',rs_plans:'Plan pages',rs_photos:'Photos',rs_history:'History',rs_logged:'Logged time',rs_group:'Group by room',rs_noroom:'No room',rs_rmrep:'report',rs_addrep:'report',
     projbtn:'📁 Select / manage projects',proj_modal_h:'Projects',proj_save:'＋ Save current',proj_import:'Import CSV',proj_export:'Export CSV',proj_close:'Close',
     markup:'Mark up',capgps:'Capture GPS',update:'Update',logged:'Logged',
     recmemo:'Record memo',stopmemo:'Stop',autosave:'Auto-saving to this browser. Backup regularly.',
@@ -461,7 +461,7 @@ const I18N={
     rpt_included:'In verslag — tik om uit te sluit',rpt_excluded:'Uitgesluit — tik om in te sluit',rpt_tag:'✕ nie in verslag',
     undo:'Ontdoen',editno:'Tik om nommer te wysig',renum:'⇅ Hernommer 1..N',
     rs_h:'Verslag-afdelings',rs_hint:'Kies watter afdelings in die PDF / Word-verslag verskyn.',
-    rs_summary:'Opsomming',rs_plans:'Planbladsye',rs_photos:'Foto’s',rs_history:'Geskiedenis',rs_rmrep:'verslag',rs_addrep:'verslag',
+    rs_summary:'Opsomming',rs_plans:'Planbladsye',rs_photos:'Foto’s',rs_history:'Geskiedenis',rs_logged:'Gelog-tyd',rs_group:'Groepeer per kamer',rs_noroom:'Geen kamer',rs_rmrep:'verslag',rs_addrep:'verslag',
     projbtn:'📁 Kies / bestuur projekte',proj_modal_h:'Projekte',proj_save:'＋ Stoor huidige',proj_import:'Voer CSV in',proj_export:'Voer CSV uit',proj_close:'Sluit',
     markup:'Merk',capgps:'Kry GPS',update:'Werk by',logged:'Gelog',
     recmemo:'Neem memo op',stopmemo:'Stop',autosave:'Outomaties gestoor in hierdie blaaier. Rugsteun gereeld.',
@@ -568,7 +568,7 @@ function isSurvey(){ return curMode==='survey'; }
 function tradeList(){ return isSurvey()?SYSTEMS:TRADES; }
 function prioList(){ return isSurvey()?TIMEFRAMES:PRIORITIES; }
 // which whole sections appear in the PDF/Word report (per inspection)
-const REPORT_SECTIONS=['summary','plans','photos','history'];
+const REPORT_SECTIONS=['summary','plans','photos','history','logged'];
 let curReportOpts={summary:true,plans:true,photos:true,history:true};
 function rptOn(k){ return curReportOpts[k]!==false; }
 
@@ -628,7 +628,7 @@ function applyFirmDefaults(snap){
   if(!snap.logo && FIRM_DEFAULTS.logo && FIRM_DEFAULTS.logo!=='__LOGO_DATA_URL__') snap.logo = FIRM_DEFAULTS.logo;
   return snap;
 }
-function blankSnapshot(){ return applyFirmDefaults({meta:{firm:'',details:'',name:'',no:'',client:'',addr:'',inspector:'',date:new Date().toISOString().slice(0,10),weather:''}, items:[], seq:0, logo:null, plans:[], mode:'snag', reportOpts:{summary:true,plans:true,photos:true,history:true}, hidden:[], v:4}); }
+function blankSnapshot(){ return applyFirmDefaults({meta:{firm:'',details:'',name:'',no:'',client:'',addr:'',inspector:'',date:new Date().toISOString().slice(0,10),weather:''}, items:[], seq:0, logo:null, plans:[], mode:'snag', reportOpts:{summary:true,plans:true,photos:true,history:true,group:false}, hidden:[], v:4}); }
 
 function curSnapshot(){ return {meta:meta(), items, seq, logo:logoData, plans, mode:curMode, reportOpts:curReportOpts, hidden:[...curHidden], v:4}; }
 function saveCurrentToStore(){ if(store.current){ store.inspections[store.current]=curSnapshot(); } }
@@ -644,7 +644,7 @@ function loadCurrentFromStore(){
 function applySnapshotToForm(d){
   const m=d.meta||{};
   curMode = (d.mode==='survey') ? 'survey' : 'snag';
-  curReportOpts = Object.assign({summary:true,plans:true,photos:true,history:true}, d.reportOpts||{});
+  curReportOpts = Object.assign({summary:true,plans:true,photos:true,history:true,group:false}, d.reportOpts||{});
   curHidden = new Set(d.hidden||[]);
   setVal('f_firm',m.firm);setVal('f_details',m.details);setVal('p_name',m.name);setVal('p_no',m.no);
   setVal('p_client',m.client);setVal('p_addr',m.addr);setVal('p_inspector',m.inspector);
@@ -1315,7 +1315,14 @@ function renderFilters(){ const f=document.getElementById('filters');
     const lbl=(g==='status')?(isSurvey()?T('cond_'+v):T(v)):v;
     html+=`<div class="fchip" data-on="${on}" onclick="toggleFilter('${g}','${v.replace(/'/g,"\\'")}')">${lbl}</div>`; })); f.innerHTML=html; }
 function renderReportOpts(){ const el=document.getElementById('rptOpts'); if(!el) return;
-  el.innerHTML=REPORT_SECTIONS.map(k=>`<div class="fchip" data-on="${rptOn(k)?1:0}" onclick="toggleReportOpt('${k}')">${escHtml(T('rs_'+k))}</div>`).join(''); }
+  el.innerHTML=REPORT_SECTIONS.map(k=>`<div class="fchip" data-on="${rptOn(k)?1:0}" onclick="toggleReportOpt('${k}')">${escHtml(T('rs_'+k))}</div>`).join('')
+    + `<div class="fchip" data-on="${curReportOpts.group?1:0}" onclick="toggleGroupByRoom()">${escHtml(T('rs_group'))}</div>`; }
+function toggleGroupByRoom(){ curReportOpts.group=!curReportOpts.group; touch(); renderReportOpts();
+  flash(curReportOpts.group?(lang==='af'?'Verslag groepeer per kamer.':'Report grouped by room.'):(lang==='af'?'Verslag volg nommer-volgorde.':'Report follows number order.')); }
+// group the detail by room when enabled (room subheadings); else a flat list in number order
+function buildGroups(list){ if(!curReportOpts.group) return [{room:null,list}];
+  const map=new Map(); list.forEach(it=>{ const k=(it.room||'').trim()||T('rs_noroom'); if(!map.has(k)) map.set(k,[]); map.get(k).push(it); });
+  return [...map.entries()].map(([room,l])=>({room,list:l})).sort((a,b)=>Math.min(...a.list.map(i=>i.snag))-Math.min(...b.list.map(i=>i.snag))); }
 function toggleReportOpt(k){ curReportOpts[k]=!rptOn(k); touch(); renderReportOpts();
   flash(rptOn(k)?(T('rs_'+k)+': '+(lang==='af'?'ingesluit':'included')):(T('rs_'+k)+': '+(lang==='af'?'uitgesluit':'excluded'))); }
 
@@ -1565,7 +1572,9 @@ async function exportDOC(){
   // detail
   b+=`<h2 style="font-size:13pt">${esc(T(survey?'pdf_detail_survey':'pdf_detail'))}</h2>`;
   const fld=(lbl,val)=>{ return val?`<div><b>${esc(lbl)}</b> ${esc(val)}</div>`:''; };
-  for(const it of ordered){
+  for(const g of buildGroups(ordered)){
+   if(g.room) b+=`<div style="font-weight:bold;font-size:12pt;margin-top:16px;border-bottom:1px solid #999;padding-bottom:3px">${esc(g.room)}</div>`;
+   for(const it of g.list){
     b+=`<div style="margin-top:14px;border-top:1px solid #bbb;padding-top:8px;page-break-inside:avoid;">`;
     const tag=[it.trade,it.priority].filter(Boolean).join(' · '); const rl=rlabel(it);
     const metaR=[(rl&&rl!=='—')?rl:'', tag?'['+tag+']':''].filter(Boolean).join(' ');
@@ -1573,19 +1582,20 @@ async function exportDOC(){
     // notes/observations prominent first
     b+=`<div style="margin-top:5px"><b>${esc(T(survey?'pdf_obs':'pdf_notes'))}</b><div style="font-size:11.5pt;margin-top:1px">${nl2br(it.notes||'—')}</div></div>`;
     if(survey){ b+=`<div style="margin-top:5px"><b>${esc(T('pdf_rec'))}</b><div style="font-size:11.5pt;margin-top:1px">${nl2br(it.recommendation||'—')}</div></div>`; }
-    // compact meta line
+    // compact meta line (room, location…) — logged moves to the end of the snag
     const meta1=[]; if(survey&&it.asset) meta1.push('<b>'+esc(T('pdf_asset'))+'</b> '+esc(it.asset));
-    meta1.push('<b>'+esc(T('pdf_loc'))+'</b> '+esc(it.loc||'—'));
     if(it.room) meta1.push('<b>'+esc(T('room'))+':</b> '+esc(it.room));
+    meta1.push('<b>'+esc(T('pdf_loc'))+'</b> '+esc(it.loc||'—'));
     if(survey&&it.life) meta1.push('<b>'+esc(T('pdf_life'))+'</b> '+esc(it.life));
-    meta1.push('<b>'+esc(T('pdf_logged'))+'</b> '+esc(it.ts||'—'));
     if(it.gps) meta1.push('GPS: '+it.gps.lat.toFixed(5)+', '+it.gps.lng.toFixed(5));
     b+=`<div style="margin-top:4px;font-size:9pt;color:#555">${meta1.join(' &nbsp;&nbsp; ')}</div>`;
     if(rptOn('history') && it.history&&it.history.length){ b+=`<div style="margin-top:4px;font-size:9pt;color:#555"><i>${lang==='af'?'Statusgeskiedenis':'Status history'}:</i><br>`+it.history.map(h=>`• ${esc(h.ts)}: ${esc(h.from)} &rarr; ${esc(h.to)}`).join('<br>')+`</div>`; }
     if(rptOn('plans') && it.planRef){ const crop=await planCropImage(it);
       if(crop) b+=`<div style="margin-top:4px"><b>Plan: ${esc(planNameById(it.planRef.planId))}</b><br><img src="${crop}" style="width:48%;border:1px solid #ccc"></div>`; }
     if(rptOn('photos') && it.photos&&it.photos.length){ b+=`<div style="margin-top:6px">`; it.photos.forEach(p=>b+=`<img src="${p}" style="width:45%;margin:2px;border:1px solid #ccc">`); b+=`</div>`; }
+    if(rptOn('logged') && it.ts) b+=`<div style="margin-top:4px;font-size:8.5pt;color:#777">${esc(T('pdf_logged'))} ${esc(it.ts)}</div>`;
     b+=`</div>`;
+   }
   }
   // plan pages (flattened image with all markup, matching the PDF)
   if(rptOn('plans')) for(const pl of plans){
@@ -1674,7 +1684,9 @@ async function exportPDF(){
   doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20); ck(10); doc.text(secNo.toFixed(1)+'  '+T(isSurvey()?'pdf_detail_survey':'pdf_detail'),M,y); y+=7;
   const ordered=[...items].filter(inRep).sort((a,b)=>a.snag-b.snag);
   const PW=(W-2*M-6)/2;   // half-width column (plan crop / photo)
-  for(const it of ordered){
+  for(const g of buildGroups(ordered)){
+   if(g.room){ ck(22); doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(30); doc.text(g.room,M,y); y+=2; line(y,true); y+=6; }
+   for(const it of g.list){
     // image cells, 2 per row: plan crop first so the photo sits NEXT TO the plan.
     // Each cell is capped to PW × MAXH (centred) so rows stay compact → 2 snags per page.
     const MAXH=52; const fitCell=(w0,h0)=>{ let dw=PW, dh=PW*h0/w0; if(dh>MAXH){ dw=PW*MAXH/dh; dh=MAXH; } return {w:dw,h:dh}; };
@@ -1702,13 +1714,13 @@ async function exportPDF(){
       y+=1.5; doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor(20); doc.text(T('pdf_rec'),M,y); y+=5.5;
       doc.setFont('helvetica','normal'); doc.setFontSize(10.5); doc.splitTextToSize(it.recommendation||'—',W-2*M).forEach(t=>{ ck(7); doc.text(t,M,y); y+=5.5; });
     }
-    // meta — compact, muted line (location, logged, etc.)
+    // meta — compact, muted line (room, location, etc.)  — logged moves to the end of the snag
     y+=1.5; doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(110);
     const meta1=[];
     if(isSurvey()&&it.asset) meta1.push(T('pdf_asset')+' '+it.asset);
+    if(it.room) meta1.push(T('room')+': '+it.room);
     meta1.push(T('pdf_loc')+' '+(it.loc||'—'));
     if(isSurvey()&&it.life) meta1.push(T('pdf_life')+' '+it.life);
-    meta1.push(T('pdf_logged')+' '+(it.ts||'—'));
     if(it.gps) meta1.push('GPS: '+it.gps.lat.toFixed(5)+', '+it.gps.lng.toFixed(5));
     if(it.audio) meta1.push(lang==='af'?'(stemmemo)':'(voice memo)');
     doc.splitTextToSize(meta1.join('      '),W-2*M).forEach(t=>{ ck(5); doc.text(t,M,y); y+=4.2; });
@@ -1720,7 +1732,10 @@ async function exportPDF(){
       let col=0,rowH=0; for(const c of cells){ if(col===0) ck(c.h+6); const x=M+col*(PW+6); const dx=x+(PW-c.w)/2;
         try{ doc.addImage(c.src,'JPEG',dx,y,c.w,c.h); }catch(e){} doc.setDrawColor(c.plan?140:200); doc.setLineWidth(0.2); doc.rect(dx,y,c.w,c.h); rowH=Math.max(rowH,c.h); col++; if(col===2){ y+=rowH+5; col=0; rowH=0; } }
       if(col===1) y+=rowH+5; }
+    // logged time at the END of the snag (optional)
+    if(rptOn('logged') && it.ts){ y+=1.5; doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120); doc.text(T('pdf_logged')+' '+it.ts,M,y); y+=4; doc.setTextColor(20); }
     y+=2; line(y,true); y+=6;
+   }
   }
 
   // ---- reference plan page(s) with pins ----
