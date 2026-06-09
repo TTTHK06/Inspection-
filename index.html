@@ -331,6 +331,7 @@
 
   <div class="filters" id="filters"></div>
   <div id="items"></div>
+  <div style="display:flex;justify-content:flex-end;margin-bottom:10px;"><button class="tb-btn" onclick="renumberItems()" id="t_renum">⇅ Renumber 1..N</button></div>
   <button class="add" onclick="addItem()" id="t_additem">＋ Add Inspection Item</button>
 
   <section class="panel">
@@ -342,6 +343,7 @@
 
 <div class="footer-bar">
   <div class="footer-inner">
+    <button class="btn btn-sec" onclick="undo()" id="undoBtn" title="Undo" disabled style="opacity:.45">↶ <span id="t_undo">Undo</span></button>
     <button class="btn btn-sec" onclick="exportJSON()" id="t_backup">Backup</button>
     <button class="btn btn-sec" onclick="importJSON()" id="t_restore">Restore</button>
     <button class="btn btn-sec" onclick="exportCSV()" id="t_csv">CSV</button>
@@ -418,6 +420,7 @@ const I18N={
     cam_flip:'Flip',cam_shoot:'Capture',cam_close:'Close',
     word:'Word',phrases:'Phrases',phradd:'Add',phrclose:'Close',phrnew:'Add a phrase…',
     rpt_included:'In report — tap to exclude',rpt_excluded:'Excluded — tap to include',rpt_tag:'✕ not in report',
+    undo:'Undo',editno:'Tap to edit number',renum:'⇅ Renumber 1..N',
     rs_h:'Report sections',rs_hint:'Toggle which sections appear in the PDF / Word report.',
     rs_summary:'Summary',rs_plans:'Plan pages',rs_photos:'Photos',rs_history:'History',
     projbtn:'📁 Select / manage projects',proj_modal_h:'Projects',proj_save:'＋ Save current',proj_import:'Import CSV',proj_export:'Export CSV',proj_close:'Close',
@@ -451,6 +454,7 @@ const I18N={
     cam_flip:'Wissel',cam_shoot:'Neem',cam_close:'Sluit',
     word:'Word',phrases:'Frases',phradd:'Voeg by',phrclose:'Sluit',phrnew:'Voeg ’n frase by…',
     rpt_included:'In verslag — tik om uit te sluit',rpt_excluded:'Uitgesluit — tik om in te sluit',rpt_tag:'✕ nie in verslag',
+    undo:'Ontdoen',editno:'Tik om nommer te wysig',renum:'⇅ Hernommer 1..N',
     rs_h:'Verslag-afdelings',rs_hint:'Kies watter afdelings in die PDF / Word-verslag verskyn.',
     rs_summary:'Opsomming',rs_plans:'Planbladsye',rs_photos:'Foto’s',rs_history:'Geskiedenis',
     projbtn:'📁 Kies / bestuur projekte',proj_modal_h:'Projekte',proj_save:'＋ Stoor huidige',proj_import:'Voer CSV in',proj_export:'Voer CSV uit',proj_close:'Sluit',
@@ -488,6 +492,7 @@ function applyLang(){
   { const ai=document.getElementById('t_additem'); if(ai) ai.textContent=T(isSurvey()?'additem_survey':'additem'); }
   set('t_rs_h','rs_h');set('t_rs_hint','rs_hint');
   set('t_projbtn','projbtn');set('t_proj_modal_h','proj_modal_h');set('t_proj_save','proj_save');set('t_proj_import','proj_import');set('t_proj_export','proj_export');set('t_proj_close','proj_close');
+  set('t_undo','undo');set('t_renum','renum');
   set('t_backup','backup');set('t_restore','restore');set('t_csv','csv');set('t_pdf','pdf');
   set('t_new','new');set('t_dup','dup');set('t_delinsp','delinsp');
   const ri=document.getElementById('t_reinspect'); if(ri) ri.textContent=T('reinspect');
@@ -646,10 +651,20 @@ function syncSel(){ saveCurrentToStore(); const sel=document.getElementById('ins
 function switchInspection(id){ saveCurrentToStore(); persistStore(); store.current=id; loadCurrentFromStore(); activeFilters={status:new Set(),trade:new Set(),priority:new Set()}; render(); persistStore(); }
 function newInspection(){ saveCurrentToStore(); const id=uid(); store.inspections[id]=blankSnapshot(); store.order.push(id); store.current=id; loadCurrentFromStore(); items=[]; addItem(); renderInspSelector(); persistStore(); flash(lang==='af'?'Nuwe inspeksie geskep.':'New inspection created.'); }
 function duplicateInspection(){ saveCurrentToStore(); const src=store.inspections[store.current]; const copy=JSON.parse(JSON.stringify(src)); copy.meta.name=(copy.meta.name||'')+' (copy)'; const id=uid(); store.inspections[id]=copy; store.order.push(id); store.current=id; loadCurrentFromStore(); render(); renderInspSelector(); persistStore(); flash(lang==='af'?'Inspeksie gedupliseer.':'Inspection duplicated.'); }
+/* ================= undo ================= */
+let undoStack=[];   // [{label, fn}] — fn reverses the action; in-memory only
+function pushUndo(label, fn){ undoStack.push({label,fn}); if(undoStack.length>25) undoStack.shift(); updateUndoBtn(); }
+function undo(){ const a=undoStack.pop(); if(!a){ flash(lang==='af'?'Niks om terug te keer nie.':'Nothing to undo.'); return; }
+  try{ a.fn(); }catch(e){} touch(); renderInspSelector(); render(); updateUndoBtn();
+  flash((lang==='af'?'Teruggekeer: ':'Undone: ')+a.label); }
+function updateUndoBtn(){ const b=document.getElementById('undoBtn'); if(!b) return; b.disabled=!undoStack.length; b.style.opacity=undoStack.length?'1':'.45'; }
+
 function deleteInspection(){
   if(store.order.length<=1){ flash(lang==='af'?'Kan nie die laaste inspeksie skrap nie.':'Cannot delete the only inspection.'); return; }
   if(!confirm(lang==='af'?'Skrap hierdie inspeksie heeltemal?':'Delete this entire inspection?')) return;
-  delete store.inspections[store.current]; store.order=store.order.filter(x=>x!==store.current);
+  const delId=store.current, snap=store.inspections[delId], orderIdx=store.order.indexOf(delId);
+  pushUndo(lang==='af'?'skrap inspeksie':'delete inspection', ()=>{ store.inspections[delId]=snap; store.order.splice(orderIdx,0,delId); store.current=delId; loadCurrentFromStore(); renderInspSelector(); persistStore(); });
+  delete store.inspections[delId]; store.order=store.order.filter(x=>x!==delId);
   store.current=store.order[0]; loadCurrentFromStore(); render(); renderInspSelector(); persistStore();
 }
 
@@ -659,7 +674,25 @@ function addItem(data){
   else{ seq++; items.push({id:uid(),snag:seq,loc:'',asset:'',life:'',status:'',condition:'',recommendation:'',trade:'',priority:'',notes:'',photos:[],audio:null,gps:null,ts:nowStamp(),history:[]}); }
   touch(); render();
 }
-function delItem(id){ if(!confirm(lang==='af'?'Skrap hierdie item?':'Delete this item?')) return; items=items.filter(i=>i.id!==id); touch(); render(); }
+function delItem(id){ if(!confirm(lang==='af'?'Skrap hierdie item?':'Delete this item?')) return;
+  const idx=items.findIndex(i=>i.id===id); if(idx<0) return; const removed=items[idx];
+  const prevSnags=items.map(i=>({id:i.id,snag:i.snag})), prevSeq=seq;
+  pushUndo((lang==='af'?'skrap ':'delete ')+(isSurvey()?T('item_no'):T('snag_no'))+' '+String(removed.snag).padStart(3,'0'),
+    ()=>{ items.splice(idx,0,removed); prevSnags.forEach(p=>{ const it=items.find(x=>x.id===p.id); if(it) it.snag=p.snag; }); seq=prevSeq; });
+  items.splice(idx,1);
+  // close the gap: renumber remaining items 1..N in their current order
+  [...items].sort((a,b)=>a.snag-b.snag).forEach((it,i)=>it.snag=i+1); seq=items.length;
+  touch(); render(); }
+function editSnagNo(id){ const it=items.find(i=>i.id===id); if(!it) return;
+  const v=prompt((isSurvey()?T('item_no'):T('snag_no'))+' '+(lang==='af'?'nommer:':'number:'), it.snag); if(v==null) return;
+  const n=parseInt(v,10); if(!isFinite(n)||n<1){ flash(lang==='af'?'Ongeldige nommer.':'Invalid number.'); return; }
+  const prev=it.snag; pushUndo(lang==='af'?'nommer wysig':'edit number', ()=>{ it.snag=prev; });
+  it.snag=n; if(n>seq) seq=n; touch(); render(); }
+function renumberItems(){ if(!items.length) return;
+  const prev=items.map(i=>({id:i.id,snag:i.snag})), prevSeq=seq;
+  pushUndo(lang==='af'?'hernommer':'renumber', ()=>{ prev.forEach(p=>{ const it=items.find(x=>x.id===p.id); if(it) it.snag=p.snag; }); seq=prevSeq; });
+  [...items].sort((a,b)=>a.snag-b.snag).forEach((it,i)=>it.snag=i+1); seq=items.length; touch(); render();
+  flash(lang==='af'?'Items hernommer (1..N).':'Items renumbered (1..N).'); }
 function toggleExclude(id){ const it=items.find(i=>i.id===id); if(!it) return; it.excluded=!it.excluded; touch(); render();
   flash(it.excluded?(lang==='af'?'Uitgesluit uit verslag.':'Excluded from report.'):(lang==='af'?'Ingesluit in verslag.':'Included in report.')); }
 const inRep=it=>!it.excluded;   // items that appear in exported reports
@@ -668,6 +701,7 @@ function dupItem(id){ const src=items.find(i=>i.id===id); if(!src) return;
   copy.id=uid(); copy.snag=seq; copy.status=''; copy.history=[]; copy.ts=nowStamp(); copy.photos=[]; copy.audio=null;
   // keep loc/trade/priority/notes as a starting point; clear evidence so it's a fresh observation
   const idx=items.findIndex(i=>i.id===id); items.splice(idx+1,0,copy); touch(); render();
+  pushUndo(lang==='af'?'dupliseer item':'duplicate item', ()=>{ items=items.filter(i=>i.id!==copy.id); });
   flash(lang==='af'?'Item gedupliseer.':'Item duplicated.');
 }
 function carryForward(){
@@ -1284,7 +1318,7 @@ function itemCard(it){
     : '';
   div.innerHTML=`
     <div class="item-head">
-      <span class="item-no">${T(isSurvey()?'item_no':'snag_no')} ${String(it.snag).padStart(3,'0')}</span>
+      <span class="item-no" style="cursor:pointer" onclick="editSnagNo(${js(it.id)})" title="${T('editno')}">${T(isSurvey()?'item_no':'snag_no')} ${String(it.snag).padStart(3,'0')}</span>
       ${it.excluded?`<span class="excl-tag">${T('rpt_tag')}</span>`:''}
       <span class="loc" id="loclbl_${it.id}">${it.loc||'(no location set)'}</span>
       <button class="rpt${it.excluded?' off':''}" onclick="toggleExclude(${js(it.id)})" title="${it.excluded?T('rpt_excluded'):T('rpt_included')}">${it.excluded?'☐':'☑'}</button>
@@ -1328,7 +1362,7 @@ function itemCard(it){
 }
 function render(){
   if(recId!=null) stopDictation();
-  renderInspSelector(); renderFilters(); renderReportOpts(); applyLangStatic();
+  renderInspSelector(); renderFilters(); renderReportOpts(); applyLangStatic(); updateUndoBtn();
   const c=document.getElementById('items'); c.innerHTML='';
   const shown=items.filter(passesFilter);
   if(shown.length===0){ c.innerHTML=`<div class="panel" style="text-align:center;color:var(--muted);font-size:12px">${lang==='af'?'Geen items pas by die filter nie.':'No items match the current filter.'}</div>`; return; }
@@ -1495,7 +1529,7 @@ async function exportDOC(){
   b+=`<h2 style="font-size:13pt">${esc(T(survey?'pdf_detail_survey':'pdf_detail'))}</h2>`;
   const fld=(lbl,val)=>{ return val?`<div><b>${esc(lbl)}</b> ${esc(val)}</div>`:''; };
   for(const it of ordered){
-    b+=`<div style="margin-top:14px;border-top:1px solid #bbb;padding-top:8px">`;
+    b+=`<div style="margin-top:14px;border-top:1px solid #bbb;padding-top:8px;page-break-inside:avoid;">`;
     const tag=[it.trade,it.priority].filter(Boolean).join(' · '); const rl=rlabel(it);
     const metaR=[(rl&&rl!=='—')?rl:'', tag?'['+tag+']':''].filter(Boolean).join(' ');
     b+=`<div style="font-weight:bold;font-size:12pt">${esc(num(it))}${metaR?' — '+esc(metaR):''}</div>`;
@@ -1599,7 +1633,25 @@ async function exportPDF(){
   }
   doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20); ck(10); doc.text(secNo.toFixed(1)+'  '+T(isSurvey()?'pdf_detail_survey':'pdf_detail'),M,y); y+=7;
   const ordered=[...items].filter(inRep).sort((a,b)=>a.snag-b.snag);
-  for(const it of ordered){ ck(30);
+  const PW=(W-2*M-6)/2;
+  for(const it of ordered){
+    // Pre-measure the whole item (incl. plan crop + photos, fetched once) so its header,
+    // plan reference and pictures stay together on one page.
+    let crop=null, cropChh=0;
+    if(rptOn('plans') && it.planRef){ crop=await planCropImage(it); if(crop){ try{ const d=await imgDim(crop); cropChh=58*d.h/d.w; }catch(e){ crop=null; } } }
+    const photoList=[];
+    if(rptOn('photos') && it.photos && it.photos.length){ for(const ph0 of it.photos){ let d; try{ d=await imgDim(ph0); }catch(e){ d={w:4,h:3}; } photoList.push({src:ph0,h:PW*d.h/d.w}); } }
+    let est=8+6+6;                       // header + location + logged
+    if(isSurvey()&&it.asset) est+=6;
+    if(it.gps) est+=6; if(it.audio) est+=6;
+    est+=5+5*doc.splitTextToSize(it.notes||'—',W-2*M).length;
+    if(isSurvey()) est+=1+5+5*doc.splitTextToSize(it.recommendation||'—',W-2*M).length+(it.life?6:0);
+    if(rptOn('history') && it.history&&it.history.length) est+=5+4*it.history.length;
+    if(crop) est+=8+cropChh;
+    for(let i=0;i<photoList.length;i+=2) est+=Math.max(photoList[i].h, photoList[i+1]?photoList[i+1].h:0)+6;
+    est+=11;
+    if(y+est>H-20 && y>M+2){ doc.addPage(); y=M; }   // keep the block together
+    ck(30);
     doc.setFillColor(28,33,43); doc.rect(M,y-4.5,W-2*M,7,'F'); doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(255);
     doc.text(`${T(isSurvey()?'item_no':'snag_no')} ${String(it.snag).padStart(3,'0')}`,M+2,y); doc.setTextColor(250,200,60);
     const tag=[it.trade,it.priority].filter(Boolean).join(' · '); const rl=rlabel(it);
@@ -1618,14 +1670,10 @@ async function exportPDF(){
     if(rptOn('history') && it.history&&it.history.length){ y+=1; doc.setFont('helvetica','italic'); doc.setFontSize(8); doc.setTextColor(110); doc.text('Status history:',M,y); y+=4;
       it.history.forEach(h=>{ ck(5); doc.text(`• ${h.ts}: ${h.from} → ${h.to}`,M+3,y); y+=4; }); doc.setTextColor(20); }
     y+=2;
-    if(rptOn('plans') && it.planRef){ const crop=await planCropImage(it);
-      if(crop){ try{ const d=await imgDim(crop); const cw=58, chh=cw*d.h/d.w; ck(chh+8);
-        doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(20); doc.text('Plan: '+planNameById(it.planRef.planId),M,y); y+=4;
-        doc.addImage(crop,'JPEG',M,y,cw,chh); doc.setDrawColor(200); doc.setLineWidth(0.2); doc.rect(M,y,cw,chh); y+=chh+4; }catch(e){} } }
-    if(rptOn('photos') && it.photos.length){ const pw=(W-2*M-6)/2,gap=6; let col=0,rowH=0;
-      for(const ph0 of it.photos){ const dim=await imgDim(ph0); const ph=pw*dim.h/dim.w; if(col===0) ck(ph+6);
-        const x=M+col*(pw+gap); try{ doc.addImage(ph0,'JPEG',x,y,pw,ph); }catch(e){} doc.setDrawColor(200); doc.rect(x,y,pw,ph); rowH=Math.max(rowH,ph); col++; if(col===2){ y+=rowH+gap; col=0; rowH=0; } }
-      if(col===1) y+=rowH+gap; }
+    if(crop){ doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(20); doc.text('Plan: '+planNameById(it.planRef.planId),M,y); y+=4;
+      try{ doc.addImage(crop,'JPEG',M,y,58,cropChh); }catch(e){} doc.setDrawColor(200); doc.setLineWidth(0.2); doc.rect(M,y,58,cropChh); y+=cropChh+4; }
+    if(photoList.length){ let col=0,rowH=0; for(const p of photoList){ if(col===0) ck(p.h+6); const x=M+col*(PW+6);
+        try{ doc.addImage(p.src,'JPEG',x,y,PW,p.h); }catch(e){} doc.setDrawColor(200); doc.rect(x,y,PW,p.h); rowH=Math.max(rowH,p.h); col++; if(col===2){ y+=rowH+6; col=0; rowH=0; } } if(col===1) y+=rowH+6; }
     y+=2; line(y,true); y+=7;
   }
 
