@@ -1635,23 +1635,12 @@ async function exportPDF(){
   const ordered=[...items].filter(inRep).sort((a,b)=>a.snag-b.snag);
   const PW=(W-2*M-6)/2;
   for(const it of ordered){
-    // Pre-measure the whole item (incl. plan crop + photos, fetched once) so its header,
-    // plan reference and pictures stay together on one page.
+    // One snag per page: each item gets its own page (header, fields, plan reference, photos together).
+    doc.addPage(); y=M;
     let crop=null, cropChh=0;
     if(rptOn('plans') && it.planRef){ crop=await planCropImage(it); if(crop){ try{ const d=await imgDim(crop); cropChh=58*d.h/d.w; }catch(e){ crop=null; } } }
     const photoList=[];
     if(rptOn('photos') && it.photos && it.photos.length){ for(const ph0 of it.photos){ let d; try{ d=await imgDim(ph0); }catch(e){ d={w:4,h:3}; } photoList.push({src:ph0,h:PW*d.h/d.w}); } }
-    let est=8+6+6;                       // header + location + logged
-    if(isSurvey()&&it.asset) est+=6;
-    if(it.gps) est+=6; if(it.audio) est+=6;
-    est+=5+5*doc.splitTextToSize(it.notes||'—',W-2*M).length;
-    if(isSurvey()) est+=1+5+5*doc.splitTextToSize(it.recommendation||'—',W-2*M).length+(it.life?6:0);
-    if(rptOn('history') && it.history&&it.history.length) est+=5+4*it.history.length;
-    if(crop) est+=8+cropChh;
-    for(let i=0;i<photoList.length;i+=2) est+=Math.max(photoList[i].h, photoList[i+1]?photoList[i+1].h:0)+6;
-    est+=11;
-    if(y+est>H-20 && y>M+2){ doc.addPage(); y=M; }   // keep the block together
-    ck(30);
     doc.setFillColor(28,33,43); doc.rect(M,y-4.5,W-2*M,7,'F'); doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(255);
     doc.text(`${T(isSurvey()?'item_no':'snag_no')} ${String(it.snag).padStart(3,'0')}`,M+2,y); doc.setTextColor(250,200,60);
     const tag=[it.trade,it.priority].filter(Boolean).join(' · '); const rl=rlabel(it);
