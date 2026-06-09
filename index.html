@@ -441,7 +441,7 @@ const I18N={
     pdf_title_survey:'BUILDING CONDITION SURVEY',pdf_sub_survey:'Existing building — condition assessment record',
     pdf_summary_survey:'Condition Summary',pdf_detail_survey:'Condition Survey Detail',
     pdf_rec:'Recommendation:',pdf_cost:'Est. cost:',pdf_total:'Total estimated cost',pdf_cond:'Condition:',
-    pdf_obs:'Observations:',pdf_asset:'Asset:',pdf_life:'Rem. life:',pdf_system:'System:'},
+    pdf_obs:'Observations:',pdf_asset:'Asset:',pdf_life:'Rem. life:',pdf_system:'System:',pdf_refplan:'Reference Plan'},
   af:{title:'Inspeksie Foutlys',sub:'Veldopname · terreinrekord · PDF-uitvoer',langBtn:'ENG',
     firm_h:'Firma / Briefhoof',logo:'Logo (opsioneel)',uplogo:'Laai Logo',rmlogo:'Verwyder',
     firmname:'Firmanaam',firmdet:'Firmabesonderhede (adres / tel / e-pos)',proj_h:'Projekbesonderhede',
@@ -475,7 +475,7 @@ const I18N={
     pdf_title_survey:'GEBOU TOESTANDSOPNAME',pdf_sub_survey:'Bestaande gebou — toestandbeoordelingsrekord',
     pdf_summary_survey:'Toestand Opsomming',pdf_detail_survey:'Toestandsopname Besonderhede',
     pdf_rec:'Aanbeveling:',pdf_cost:'Beraamde koste:',pdf_total:'Totale beraamde koste',pdf_cond:'Toestand:',
-    pdf_obs:'Waarnemings:',pdf_asset:'Bate:',pdf_life:'Oorbl. lewe:',pdf_system:'Stelsel:'}
+    pdf_obs:'Waarnemings:',pdf_asset:'Bate:',pdf_life:'Oorbl. lewe:',pdf_system:'Stelsel:',pdf_refplan:'Verwysingsplan'}
 };
 let lang = localStorage.getItem('snag_lang') || 'en';
 function T(k){ return (I18N[lang]&&I18N[lang][k])||I18N.en[k]||k; }
@@ -1549,7 +1549,7 @@ async function exportDOC(){
   // plan pages (flattened image with all markup, matching the PDF)
   if(rptOn('plans')) for(const pl of plans){
     const comp=await planComposite(pl); if(!comp) continue;
-    b+=`<h2 style="font-size:13pt">${esc('Plan: '+(pl.name||'Plan'))}</h2>`;
+    b+=`<h2 style="font-size:13pt">${esc(T('pdf_refplan')+': '+(pl.name||'Plan'))}</h2>`;
     b+=`<div><img src="${comp}" style="width:100%;border:1px solid #ccc"></div>`;
     const pinned=items.filter(it=>it.planRef&&it.planRef.planId===pl.id&&inRep(it)).sort((a,b)=>a.snag-b.snag);
     if(pinned.length) b+=`<div style="font-size:9pt;color:#555;margin-top:4px">`+pinned.map(it=>`${String(it.snag).padStart(3,'0')}: ${esc(it.room||it.loc||'—')}`).join(' &nbsp; ')+`</div>`;
@@ -1633,14 +1633,23 @@ async function exportPDF(){
   }
   doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20); ck(10); doc.text(secNo.toFixed(1)+'  '+T(isSurvey()?'pdf_detail_survey':'pdf_detail'),M,y); y+=7;
   const ordered=[...items].filter(inRep).sort((a,b)=>a.snag-b.snag);
-  const PW=(W-2*M-6)/2;
+  const PW=(W-2*M-6)/2;   // half-width column (plan crop / photo)
   for(const it of ordered){
-    // One snag per page: each item gets its own page (header, fields, plan reference, photos together).
-    doc.addPage(); y=M;
     let crop=null, cropChh=0;
-    if(rptOn('plans') && it.planRef){ crop=await planCropImage(it); if(crop){ try{ const d=await imgDim(crop); cropChh=58*d.h/d.w; }catch(e){ crop=null; } } }
+    if(rptOn('plans') && it.planRef){ crop=await planCropImage(it); if(crop){ try{ const d=await imgDim(crop); cropChh=PW*d.h/d.w; }catch(e){ crop=null; } } }
     const photoList=[];
     if(rptOn('photos') && it.photos && it.photos.length){ for(const ph0 of it.photos){ let d; try{ d=await imgDim(ph0); }catch(e){ d={w:4,h:3}; } photoList.push({src:ph0,h:PW*d.h/d.w}); } }
+    // image cells laid out 2 per row: plan crop first, so the photo sits NEXT TO the plan
+    const cells=[]; if(crop) cells.push({src:crop,h:cropChh,plan:true}); photoList.forEach(p=>cells.push(p));
+    // measure so each compact snag stays whole (≈2 fit per page)
+    let est=8+6+6;
+    if(isSurvey()&&it.asset) est+=6; if(it.gps) est+=6; if(it.audio) est+=6;
+    est+=5+5*doc.splitTextToSize(it.notes||'—',W-2*M).length;
+    if(isSurvey()) est+=1+5+5*doc.splitTextToSize(it.recommendation||'—',W-2*M).length+(it.life?6:0);
+    if(rptOn('history') && it.history&&it.history.length) est+=5+4*it.history.length;
+    if(cells.length){ est+=4; for(let i=0;i<cells.length;i+=2) est+=Math.max(cells[i].h, cells[i+1]?cells[i+1].h:0)+5; }
+    est+=10;
+    if(y+est>H-20 && y>M+2){ doc.addPage(); y=M; }
     doc.setFillColor(28,33,43); doc.rect(M,y-4.5,W-2*M,7,'F'); doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(255);
     doc.text(`${T(isSurvey()?'item_no':'snag_no')} ${String(it.snag).padStart(3,'0')}`,M+2,y); doc.setTextColor(250,200,60);
     const tag=[it.trade,it.priority].filter(Boolean).join(' · '); const rl=rlabel(it);
@@ -1658,22 +1667,24 @@ async function exportPDF(){
     }
     if(rptOn('history') && it.history&&it.history.length){ y+=1; doc.setFont('helvetica','italic'); doc.setFontSize(8); doc.setTextColor(110); doc.text('Status history:',M,y); y+=4;
       it.history.forEach(h=>{ ck(5); doc.text(`• ${h.ts}: ${h.from} → ${h.to}`,M+3,y); y+=4; }); doc.setTextColor(20); }
-    y+=2;
-    if(crop){ doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(20); doc.text('Plan: '+planNameById(it.planRef.planId),M,y); y+=4;
-      try{ doc.addImage(crop,'JPEG',M,y,58,cropChh); }catch(e){} doc.setDrawColor(200); doc.setLineWidth(0.2); doc.rect(M,y,58,cropChh); y+=cropChh+4; }
-    if(photoList.length){ let col=0,rowH=0; for(const p of photoList){ if(col===0) ck(p.h+6); const x=M+col*(PW+6);
-        try{ doc.addImage(p.src,'JPEG',x,y,PW,p.h); }catch(e){} doc.setDrawColor(200); doc.rect(x,y,PW,p.h); rowH=Math.max(rowH,p.h); col++; if(col===2){ y+=rowH+6; col=0; rowH=0; } } if(col===1) y+=rowH+6; }
-    y+=2; line(y,true); y+=7;
+    if(cells.length){ y+=2;
+      if(crop){ doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(90); doc.text('Plan: '+planNameById(it.planRef.planId),M,y); y+=3.5; doc.setTextColor(20); }
+      let col=0,rowH=0; for(const c of cells){ if(col===0) ck(c.h+6); const x=M+col*(PW+6);
+        try{ doc.addImage(c.src,'JPEG',x,y,PW,c.h); }catch(e){} doc.setDrawColor(c.plan?140:200); doc.setLineWidth(0.2); doc.rect(x,y,PW,c.h); rowH=Math.max(rowH,c.h); col++; if(col===2){ y+=rowH+5; col=0; rowH=0; } }
+      if(col===1) y+=rowH+5; }
+    y+=2; line(y,true); y+=6;
   }
 
-  // ---- plan pages with pins ----
-  if(rptOn('plans')) for(const pl of plans){
+  // ---- reference plan page(s) with pins ----
+  let signedOff=false;
+  if(rptOn('plans')) for(let pi=0; pi<plans.length; pi++){ const pl=plans[pi]; const isLastPlan=pi===plans.length-1;
     const pinned=items.filter(it=>it.planRef&&it.planRef.planId===pl.id&&inRep(it));
     doc.addPage(); y=M;
-    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20);
-    doc.text((lang==='af'?'Plan: ':'Plan: ')+(pl.name||'Plan'),M,y); y+=6;
-    // fit plan image into content width, leave room for legend
-    const availW=W-2*M, availH=H-y-M-8;
+    doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(20);
+    doc.text(T('pdf_refplan')+': '+(pl.name||'Plan'),M,y); y+=6;
+    // leave room for the sign-off on the last plan page so it fits on this page
+    const reserve=(isLastPlan && m.inspector)?50:8;
+    const availW=W-2*M, availH=H-y-M-reserve;
     let dw=availW, dh=dw*(pl.h/pl.w);
     if(dh>availH){ dh=availH; dw=dh*(pl.w/pl.h); }
     const ox=M+(availW-dw)/2, oy=y;
@@ -1713,9 +1724,15 @@ async function exportPDF(){
       const byDisc={}; syms.forEach(s=>{ (byDisc[s.disc]=byDisc[s.disc]||new Set()).add(s.k); });
       Object.keys(byDisc).forEach(d=>{ const codes=[...byDisc[d]].map(k=>k+' = '+symLabel(d,k)).join(';  ');
         doc.splitTextToSize(MEP_SYMBOLS[d].name+'  —  '+codes, W-2*M).forEach(l=>{ ck(5); doc.text(l,M,y); y+=4; }); }); }
+    // sign-off fits on the (last) reference-plan page
+    if(isLastPlan && m.inspector){ y+=5; line(y,true); y+=8;
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20); doc.text(T('pdf_signoff'),M,y); y+=10;
+      doc.setDrawColor(120); doc.setLineWidth(0.3); doc.line(M,y,M+70,y); doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(60);
+      doc.text(lang==='af'?'Inspekteur (handtekening)':'Inspector (signature)',M,y+5); doc.text(`${lang==='af'?'Naam':'Name'}:  ${m.inspector}`,M,y+12); doc.text(`${lang==='af'?'Datum':'Date'}:  ${m.date||''}`,M,y+18);
+      signedOff=true; }
   }
 
-  if(m.inspector){ y+=4; if(y+40>H-20){ doc.addPage(); y=M; } else { line(y,true); y+=8; }
+  if(m.inspector && !signedOff){ y+=4; if(y+40>H-20){ doc.addPage(); y=M; } else { line(y,true); y+=8; }
     doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20); doc.text(T('pdf_signoff'),M,y); y+=10;
     doc.setDrawColor(120); doc.setLineWidth(0.3); doc.line(M,y,M+70,y); doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(60);
     doc.text(lang==='af'?'Inspekteur (handtekening)':'Inspector (signature)',M,y+5); doc.text(`${lang==='af'?'Naam':'Name'}:  ${m.inspector}`,M,y+12); doc.text(`${lang==='af'?'Datum':'Date'}:  ${m.date||''}`,M,y+18); }
