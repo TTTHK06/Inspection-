@@ -1462,11 +1462,13 @@ function planCropImage(it){ return new Promise(res=>{
   const pl=plans.find(p=>p.id===it.planRef.planId); if(!pl||!pl.img){ res(null); return; }
   const img=new Image();
   img.onload=()=>{ try{
-    const W=pl.w||img.width, H=pl.h||img.height; const frac=0.32;
-    let cw=Math.min(W,W*frac), ch=Math.min(H,H*frac);
+    const W=pl.w||img.width, H=pl.h||img.height;
+    // tight, landscape window around the pin (independent of the plan's aspect, so tall
+    // site plans don't produce a huge vertical strip)
+    let cw=Math.min(W, W*0.24); let ch=Math.min(H, cw*0.62);
     let cx=it.planRef.fx*W-cw/2, cy=it.planRef.fy*H-ch/2;
     cx=Math.max(0,Math.min(W-cw,cx)); cy=Math.max(0,Math.min(H-ch,cy));
-    const scale=Math.min(2.5, 760/Math.max(cw,ch));
+    const scale=Math.min(3, 900/Math.max(cw,ch));
     const o=document.createElement('canvas'); o.width=Math.round(cw*scale); o.height=Math.round(ch*scale);
     const x=o.getContext('2d'); x.drawImage(img, cx,cy,cw,ch, 0,0,o.width,o.height);
     const px=(it.planRef.fx*W-cx)*scale, py=(it.planRef.fy*H-cy)*scale; const r=Math.max(9,o.width*0.045);
@@ -1635,12 +1637,12 @@ async function exportPDF(){
   const ordered=[...items].filter(inRep).sort((a,b)=>a.snag-b.snag);
   const PW=(W-2*M-6)/2;   // half-width column (plan crop / photo)
   for(const it of ordered){
-    let crop=null, cropChh=0;
-    if(rptOn('plans') && it.planRef){ crop=await planCropImage(it); if(crop){ try{ const d=await imgDim(crop); cropChh=PW*d.h/d.w; }catch(e){ crop=null; } } }
-    const photoList=[];
-    if(rptOn('photos') && it.photos && it.photos.length){ for(const ph0 of it.photos){ let d; try{ d=await imgDim(ph0); }catch(e){ d={w:4,h:3}; } photoList.push({src:ph0,h:PW*d.h/d.w}); } }
-    // image cells laid out 2 per row: plan crop first, so the photo sits NEXT TO the plan
-    const cells=[]; if(crop) cells.push({src:crop,h:cropChh,plan:true}); photoList.forEach(p=>cells.push(p));
+    // image cells, 2 per row: plan crop first so the photo sits NEXT TO the plan.
+    // Each cell is capped to PW × MAXH (centred) so rows stay compact → 2 snags per page.
+    const MAXH=52; const fitCell=(w0,h0)=>{ let dw=PW, dh=PW*h0/w0; if(dh>MAXH){ dw=PW*MAXH/dh; dh=MAXH; } return {w:dw,h:dh}; };
+    const cells=[];
+    if(rptOn('plans') && it.planRef){ const cr=await planCropImage(it); if(cr){ try{ const d=await imgDim(cr); const f=fitCell(d.w,d.h); cells.push({src:cr,w:f.w,h:f.h,plan:true}); }catch(e){} } }
+    if(rptOn('photos') && it.photos && it.photos.length){ for(const ph0 of it.photos){ let d; try{ d=await imgDim(ph0); }catch(e){ d={w:4,h:3}; } const f=fitCell(d.w,d.h); cells.push({src:ph0,w:f.w,h:f.h}); } }
     // measure so each compact snag stays whole (≈2 fit per page)
     let est=8+6+6;
     if(isSurvey()&&it.asset) est+=6; if(it.gps) est+=6; if(it.audio) est+=6;
@@ -1668,9 +1670,9 @@ async function exportPDF(){
     if(rptOn('history') && it.history&&it.history.length){ y+=1; doc.setFont('helvetica','italic'); doc.setFontSize(8); doc.setTextColor(110); doc.text('Status history:',M,y); y+=4;
       it.history.forEach(h=>{ ck(5); doc.text(`• ${h.ts}: ${h.from} → ${h.to}`,M+3,y); y+=4; }); doc.setTextColor(20); }
     if(cells.length){ y+=2;
-      if(crop){ doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(90); doc.text('Plan: '+planNameById(it.planRef.planId),M,y); y+=3.5; doc.setTextColor(20); }
-      let col=0,rowH=0; for(const c of cells){ if(col===0) ck(c.h+6); const x=M+col*(PW+6);
-        try{ doc.addImage(c.src,'JPEG',x,y,PW,c.h); }catch(e){} doc.setDrawColor(c.plan?140:200); doc.setLineWidth(0.2); doc.rect(x,y,PW,c.h); rowH=Math.max(rowH,c.h); col++; if(col===2){ y+=rowH+5; col=0; rowH=0; } }
+      if(cells[0]&&cells[0].plan){ doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(90); doc.text('Plan: '+planNameById(it.planRef.planId),M,y); y+=3.5; doc.setTextColor(20); }
+      let col=0,rowH=0; for(const c of cells){ if(col===0) ck(c.h+6); const x=M+col*(PW+6); const dx=x+(PW-c.w)/2;
+        try{ doc.addImage(c.src,'JPEG',dx,y,c.w,c.h); }catch(e){} doc.setDrawColor(c.plan?140:200); doc.setLineWidth(0.2); doc.rect(dx,y,c.w,c.h); rowH=Math.max(rowH,c.h); col++; if(col===2){ y+=rowH+5; col=0; rowH=0; } }
       if(col===1) y+=rowH+5; }
     y+=2; line(y,true); y+=6;
   }
