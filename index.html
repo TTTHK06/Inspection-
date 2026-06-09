@@ -173,6 +173,11 @@
   .phr-add input{flex:1;}
   .phr-add button,.phr-close{border:1px solid var(--line); background:var(--panel2); color:var(--ink); border-radius:8px; padding:11px 14px; font:inherit; font-size:13px; cursor:pointer;}
   .phr-close{margin-top:12px; width:100%;}
+  .phr-add .prim{background:var(--accent); color:#1a1209; border-color:var(--accent); font-weight:700;}
+  .spell-list{max-height:52vh; overflow:auto;}
+  .spell-item{padding:7px 2px; border-bottom:1px solid var(--line); font-size:13px; color:var(--ink);}
+  .spell-item .sw{color:var(--accent2);}
+  .spell-none{color:var(--ok); font-size:13px; padding:8px 2px;}
   #phraseList .roomtag{cursor:default; color:var(--ink); max-width:100%;}
   #phraseList .roomtag .ptxt{cursor:pointer; color:var(--ink);}
   .modal-tools{display:flex; gap:8px; padding:12px 0; flex-wrap:wrap; justify-content:center;}
@@ -353,7 +358,7 @@
     <button class="btn btn-sec" onclick="importJSON()" id="t_restore">Restore</button>
     <button class="btn btn-sec" onclick="exportCSV()" id="t_csv">CSV</button>
     <button class="btn btn-sec" onclick="exportDOC()" id="t_word">Word</button>
-    <button class="btn btn-pdf" onclick="exportPDF()" id="t_pdf">PDF</button>
+    <button class="btn btn-pdf" onclick="checkThenPDF()" id="t_pdf">PDF</button>
   </div>
   <div class="hint" id="hint">Auto-saving to this browser. Backup regularly.</div>
 </div>
@@ -370,6 +375,18 @@
     <button onclick="undoAnnot()">Undo</button>
     <button onclick="closeAnnot(false)">Cancel</button>
     <button class="prim" onclick="closeAnnot(true)">Save</button>
+  </div>
+</div>
+
+<!-- spell / proofread check before PDF export -->
+<div class="modal" id="spell">
+  <div class="phr-card">
+    <h2 class="phr-h" id="t_spell_h">Spell check</h2>
+    <div id="spellList" class="spell-list"></div>
+    <div class="phr-add">
+      <button onclick="closeSpell()" id="t_spell_fix">Fix in app</button>
+      <button class="prim" onclick="spellExportAnyway()" id="t_spell_go">Export anyway</button>
+    </div>
   </div>
 </div>
 
@@ -432,7 +449,8 @@ const I18N={
     markup:'Mark up',capgps:'Capture GPS',update:'Update',logged:'Logged',
     recmemo:'Record memo',stopmemo:'Stop',autosave:'Auto-saving to this browser. Backup regularly.',
     dupitem:'Duplicate item',reinspect:'Re-inspect',
-    plan_h:'Plan / Drawing',planimport:'Import PDF Plan',planrename:'Rename',plandel:'✕ Page',
+    plan_h:'Plan / Drawing',planimport:'＋ Add PDF plan',planrename:'Rename',plandel:'✕ Page',
+    spell_h:'Spell check — review before export',spell_fix:'Fix in app',spell_go:'Export anyway',
     pmpin:'Pin snag',pmsym:'MEP symbol',pmdraw:'Pen',pmmove:'Move',pmroom:'Mark room',pmzone:'Draw room',room:'Room',planlink:'Plan',nolink:'Not on plan',
     disc_hvac:'HVAC',disc_wet:'Wet',disc_drain:'Drainage',disc_fire:'Fire',penundo:'Undo',penclear:'Clear',
     pdf_title:'INSPECTION SNAG LIST',pdf_sub:'Works completed — site inspection record',
@@ -466,7 +484,8 @@ const I18N={
     markup:'Merk',capgps:'Kry GPS',update:'Werk by',logged:'Gelog',
     recmemo:'Neem memo op',stopmemo:'Stop',autosave:'Outomaties gestoor in hierdie blaaier. Rugsteun gereeld.',
     dupitem:'Dupliseer item',reinspect:'Herinspeksie',
-    plan_h:'Plan / Tekening',planimport:'Voer PDF-plan in',planrename:'Hernoem',plandel:'✕ Bladsy',
+    plan_h:'Plan / Tekening',planimport:'＋ Voeg PDF-plan by',planrename:'Hernoem',plandel:'✕ Bladsy',
+    spell_h:'Speltoets — gaan na voor uitvoer',spell_fix:'Regstel in app',spell_go:'Voer in elk geval uit',
     pmpin:'Pen fout',pmsym:'MEP simbool',pmdraw:'Pen',pmmove:'Skuif',pmroom:'Merk kamer',pmzone:'Teken kamer',room:'Kamer',planlink:'Plan',nolink:'Nie op plan',
     disc_hvac:'HVAC',disc_wet:'Nat',disc_drain:'Riolering',disc_fire:'Brand',penundo:'Ontdoen',penclear:'Vee uit',
     pdf_title:'INSPEKSIE FOUTLYS',pdf_sub:'Werk voltooi — terrein-inspeksierekord',
@@ -508,6 +527,7 @@ function applyLang(){
   if(planMode==='draw') renderPenColors();
   set('cam_flip','cam_flip');set('cam_shoot','cam_shoot');set('cam_close','cam_close');
   set('t_word','word');set('t_phrases','phrases');set('t_phradd','phradd');set('t_phrclose','phrclose');
+  set('t_spell_h','spell_h');set('t_spell_fix','spell_fix');set('t_spell_go','spell_go');
   { const pn=document.getElementById('phraseNew'); if(pn) pn.placeholder=T('phrnew'); }
   const h=document.getElementById('hint'); if(!h.dataset.flashing) h.textContent=T('autosave');
   renderFieldHides();
@@ -1616,6 +1636,26 @@ async function exportDOC(){
   document.body.appendChild(a); a.click(); setTimeout(()=>{ try{ URL.revokeObjectURL(a.href); a.remove(); }catch(e){} },0);
   flash(lang==='af'?'Word-dokument afgelaai.':'Word document downloaded.');
 }
+
+/* ================= spell / proofread check (run before PDF) ================= */
+const COMMON_TYPOS={teh:'the',adn:'and',recieve:'receive',recieved:'received',seperate:'separate',seperated:'separated',definately:'definitely',occured:'occurred',occurence:'occurrence',untill:'until',wich:'which',thier:'their',alot:'a lot',accomodate:'accommodate',accross:'across',begining:'beginning',beleive:'believe',calender:'calendar',cieling:'ceiling',concious:'conscious',enviroment:'environment',existance:'existence',goverment:'government',independant:'independent',knowlege:'knowledge',maintainance:'maintenance',maintanance:'maintenance',neccessary:'necessary',necessery:'necessary',noticable:'noticeable',occassion:'occasion',persistant:'persistent',priviledge:'privilege',recomend:'recommend',recomended:'recommended',recommendaton:'recommendation',refered:'referred',relevent:'relevant',succesful:'successful',sucessful:'successful',tendancy:'tendency',truely:'truly',wierd:'weird',instalation:'installation',instaled:'installed',equipement:'equipment',temperture:'temperature',guage:'gauge',leakage_:'leakage',inspeksie:'',damadged:'damaged',damage_:'',visable:'visible',availble:'available',requried:'required',requirment:'requirement',mantenance:'maintenance',condesate:'condensate',condensor:'condenser',insualtion:'insulation',insulaton:'insulation',ducting_:'',dont:"don't",doesnt:"doesn't",didnt:"didn't",wont:"won't",cant:"can't",isnt:"isn't",wasnt:"wasn't",arent:"aren't",hasnt:"hasn't",havent:"haven't",couldnt:"couldn't",shouldnt:"shouldn't",wouldnt:"wouldn't"};
+function spellIssues(){ const issues=[]; const survey=isSurvey();
+  const ck=(where,txt)=>{ if(!txt) return; const s=String(txt);
+    const rep=s.match(/\b(\w+)\s+\1\b/i); if(rep) issues.push({where,msg:(lang==='af'?'herhaalde woord':'repeated word')+' “'+rep[1]+' '+rep[1]+'”'});
+    if(/ {2,}/.test(s)) issues.push({where,msg:(lang==='af'?'dubbele spasie':'double space')});
+    const seen=new Set(); s.toLowerCase().replace(/[^a-z']+/g,' ').split(/\s+/).forEach(w=>{ if(w&&COMMON_TYPOS[w]&&COMMON_TYPOS[w]!==''&&!seen.has(w)){ seen.add(w); issues.push({where,msg:(lang==='af'?'moontlike tikfout':'possible typo')+' “'+w+'” → “'+COMMON_TYPOS[w]+'”'}); } }); };
+  const m=meta();
+  ck(T('pname'),m.name); ck(T('client'),m.client); ck(T('addr'),m.addr); ck(T('firmdet'),m.details);
+  items.forEach(it=>{ const n=(survey?T('item_no'):T('snag_no'))+' '+String(it.snag).padStart(3,'0');
+    ck(n+' · '+(survey?T('observations'):T('notes')), it.notes); ck(n+' · '+T('recommendation'), it.recommendation);
+    ck(n+' · '+T('loc'), it.loc); ck(n+' · '+T('room'), it.room); if(survey) ck(n+' · '+T('asset'), it.asset); });
+  return issues; }
+function checkThenPDF(){ saveCurrentToStore(); const issues=spellIssues(); const list=document.getElementById('spellList');
+  if(!issues.length){ exportPDF(); return; }
+  list.innerHTML=issues.map(i=>`<div class="spell-item"><span class="sw">${escHtml(i.where)}</span> — ${escHtml(i.msg)}</div>`).join('');
+  document.getElementById('spell').classList.add('on'); }
+function closeSpell(){ const m=document.getElementById('spell'); if(m) m.classList.remove('on'); }
+function spellExportAnyway(){ closeSpell(); exportPDF(); }
 
 /* ================= PDF ================= */
 async function exportPDF(){
