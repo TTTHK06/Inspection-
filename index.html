@@ -61,7 +61,11 @@
   textarea{resize:vertical; min-height:70px;}
   .grid2{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
   .grid2 .full{grid-column:1/-1;}
-  .field{margin-bottom:12px;} .field:last-child{margin-bottom:0;}
+  .field{margin-bottom:12px; position:relative;} .field:last-child{margin-bottom:0;}
+  .fldhide{position:absolute; top:-1px; right:0; border:1px solid var(--line); background:transparent; color:var(--muted); font-size:9px; border-radius:4px; padding:1px 6px; cursor:pointer; letter-spacing:.3px;}
+  .field.fld-hidden > label{ text-decoration:line-through; opacity:.6; }
+  .field.fld-hidden > input{ opacity:.5; }
+  .field.fld-hidden .fldhide{ color:var(--accent2); border-color:var(--accent); }
 
   .logo-row{display:flex; gap:12px; align-items:center;}
   .logo-prev{width:64px; height:64px; flex:none; border:1px solid var(--line); border-radius:8px; background:var(--bg);
@@ -296,6 +300,7 @@
         <div class="pm" data-mode="pin" data-on="1" onclick="setPlanMode('pin')" id="t_pmpin">Pin snag</div>
         <div class="pm" data-mode="symbol" data-on="0" onclick="setPlanMode('symbol')" id="t_pmsym">MEP symbol</div>
         <div class="pm" data-mode="draw" data-on="0" onclick="setPlanMode('draw')" id="t_pmdraw">Pen</div>
+        <div class="pm" data-mode="move" data-on="0" onclick="setPlanMode('move')" id="t_pmmove">Move</div>
         <div class="pm" data-mode="room" data-on="0" onclick="setPlanMode('room')" id="t_pmroom">Mark room</div>
         <div class="pm" data-mode="zone" data-on="0" onclick="setPlanMode('zone')" id="t_pmzone">Draw room</div>
       </div>
@@ -422,13 +427,13 @@ const I18N={
     rpt_included:'In report — tap to exclude',rpt_excluded:'Excluded — tap to include',rpt_tag:'✕ not in report',
     undo:'Undo',editno:'Tap to edit number',renum:'⇅ Renumber 1..N',
     rs_h:'Report sections',rs_hint:'Toggle which sections appear in the PDF / Word report.',
-    rs_summary:'Summary',rs_plans:'Plan pages',rs_photos:'Photos',rs_history:'History',
+    rs_summary:'Summary',rs_plans:'Plan pages',rs_photos:'Photos',rs_history:'History',rs_rmrep:'report',rs_addrep:'report',
     projbtn:'📁 Select / manage projects',proj_modal_h:'Projects',proj_save:'＋ Save current',proj_import:'Import CSV',proj_export:'Export CSV',proj_close:'Close',
     markup:'Mark up',capgps:'Capture GPS',update:'Update',logged:'Logged',
     recmemo:'Record memo',stopmemo:'Stop',autosave:'Auto-saving to this browser. Backup regularly.',
     dupitem:'Duplicate item',reinspect:'Re-inspect',
     plan_h:'Plan / Drawing',planimport:'Import PDF Plan',planrename:'Rename',plandel:'✕ Page',
-    pmpin:'Pin snag',pmsym:'MEP symbol',pmdraw:'Pen',pmroom:'Mark room',pmzone:'Draw room',room:'Room',planlink:'Plan',nolink:'Not on plan',
+    pmpin:'Pin snag',pmsym:'MEP symbol',pmdraw:'Pen',pmmove:'Move',pmroom:'Mark room',pmzone:'Draw room',room:'Room',planlink:'Plan',nolink:'Not on plan',
     disc_hvac:'HVAC',disc_wet:'Wet',disc_drain:'Drainage',disc_fire:'Fire',penundo:'Undo',penclear:'Clear',
     pdf_title:'INSPECTION SNAG LIST',pdf_sub:'Works completed — site inspection record',
     pdf_summary:'Outstanding Items Summary',pdf_detail:'Inspection Detail',pdf_signoff:'Sign-off',
@@ -456,13 +461,13 @@ const I18N={
     rpt_included:'In verslag — tik om uit te sluit',rpt_excluded:'Uitgesluit — tik om in te sluit',rpt_tag:'✕ nie in verslag',
     undo:'Ontdoen',editno:'Tik om nommer te wysig',renum:'⇅ Hernommer 1..N',
     rs_h:'Verslag-afdelings',rs_hint:'Kies watter afdelings in die PDF / Word-verslag verskyn.',
-    rs_summary:'Opsomming',rs_plans:'Planbladsye',rs_photos:'Foto’s',rs_history:'Geskiedenis',
+    rs_summary:'Opsomming',rs_plans:'Planbladsye',rs_photos:'Foto’s',rs_history:'Geskiedenis',rs_rmrep:'verslag',rs_addrep:'verslag',
     projbtn:'📁 Kies / bestuur projekte',proj_modal_h:'Projekte',proj_save:'＋ Stoor huidige',proj_import:'Voer CSV in',proj_export:'Voer CSV uit',proj_close:'Sluit',
     markup:'Merk',capgps:'Kry GPS',update:'Werk by',logged:'Gelog',
     recmemo:'Neem memo op',stopmemo:'Stop',autosave:'Outomaties gestoor in hierdie blaaier. Rugsteun gereeld.',
     dupitem:'Dupliseer item',reinspect:'Herinspeksie',
     plan_h:'Plan / Tekening',planimport:'Voer PDF-plan in',planrename:'Hernoem',plandel:'✕ Bladsy',
-    pmpin:'Pen fout',pmsym:'MEP simbool',pmdraw:'Pen',pmroom:'Merk kamer',pmzone:'Teken kamer',room:'Kamer',planlink:'Plan',nolink:'Nie op plan',
+    pmpin:'Pen fout',pmsym:'MEP simbool',pmdraw:'Pen',pmmove:'Skuif',pmroom:'Merk kamer',pmzone:'Teken kamer',room:'Kamer',planlink:'Plan',nolink:'Nie op plan',
     disc_hvac:'HVAC',disc_wet:'Nat',disc_drain:'Riolering',disc_fire:'Brand',penundo:'Ontdoen',penclear:'Vee uit',
     pdf_title:'INSPEKSIE FOUTLYS',pdf_sub:'Werk voltooi — terrein-inspeksierekord',
     pdf_summary:'Uitstaande Items Opsomming',pdf_detail:'Inspeksiebesonderhede',pdf_signoff:'Goedkeuring',
@@ -497,7 +502,7 @@ function applyLang(){
   set('t_new','new');set('t_dup','dup');set('t_delinsp','delinsp');
   const ri=document.getElementById('t_reinspect'); if(ri) ri.textContent=T('reinspect');
   set('t_plan_h','plan_h');set('t_planimport','planimport');set('t_planrename','planrename');set('t_plandel','plandel');
-  set('t_pmpin','pmpin');set('t_pmsym','pmsym');set('t_pmdraw','pmdraw');set('t_pmroom','pmroom');set('t_pmzone','pmzone');
+  set('t_pmpin','pmpin');set('t_pmsym','pmsym');set('t_pmdraw','pmdraw');set('t_pmmove','pmmove');set('t_pmroom','pmroom');set('t_pmzone','pmzone');
   set('t_penundo','penundo');set('t_penclear','penclear');
   if(planMode==='symbol') renderSymbolPalette();
   if(planMode==='draw') renderPenColors();
@@ -505,6 +510,7 @@ function applyLang(){
   set('t_word','word');set('t_phrases','phrases');set('t_phradd','phradd');set('t_phrclose','phrclose');
   { const pn=document.getElementById('phraseNew'); if(pn) pn.placeholder=T('phrnew'); }
   const h=document.getElementById('hint'); if(!h.dataset.flashing) h.textContent=T('autosave');
+  renderFieldHides();
 }
 function toggleLang(){ lang = lang==='en'?'af':'en'; localStorage.setItem('snag_lang',lang); applyLang(); render(); }
 
@@ -515,9 +521,10 @@ let store={inspections:{},order:[],current:null};
 let items=[], seq=0, logoData=null;
 let plans=[];            // [{id,name,img(dataURL),w,h,rooms:[{name,fx,fy}],zones:[{name,fx,fy,fw,fh}]}]
 let curPlanPage=-1;      // index into plans, -1 = none
-let planMode='pin';      // 'pin' | 'symbol' | 'room' | 'zone'
+let planMode='pin';      // 'pin' | 'symbol' | 'draw' | 'move' | 'room' | 'zone'
 let zoneDraft=null;      // in-progress zone box while dragging
 let activeFilters={status:new Set(),trade:new Set(),priority:new Set()};
+let curHidden=new Set(); // project-detail field keys hidden from the report (per inspection)
 
 /* ===== standard mechanical-services symbols for plan markup ===== */
 const MEP_SYMBOLS={
@@ -541,6 +548,13 @@ function symColor(disc){ return (MEP_SYMBOLS[disc]&&MEP_SYMBOLS[disc].color)||'#
 /* ===== freehand pen markup ===== */
 const PEN_COLORS=['#ef4444','#facc15','#22c55e','#2563eb','#111111'];
 let penColor='#ef4444', penWidth=2.4, drawStroke=null;   // drawStroke = in-progress {c,w,pts:[{fx,fy}]}
+let moveGrab=null, moveLast=null, moveOrig=null;          // drag-to-reposition state (move mode)
+function planGrab(fx,fy){ const p=plans[curPlanPage]; if(!p) return null; let best=null, bd=0.0018;  // within ~0.042 of the point
+  items.forEach(it=>{ if(it.planRef&&it.planRef.planId===p.id){ const d=(it.planRef.fx-fx)**2+(it.planRef.fy-fy)**2; if(d<bd){ bd=d; best={type:'pin',obj:it.planRef}; } } });
+  (p.symbols||[]).forEach(s=>{ const d=(s.fx-fx)**2+(s.fy-fy)**2; if(d<bd){ bd=d; best={type:'pt',obj:s}; } });
+  (p.rooms||[]).forEach(r=>{ const d=(r.fx-fx)**2+(r.fy-fy)**2; if(d<bd){ bd=d; best={type:'pt',obj:r}; } });
+  (p.draws||[]).forEach(st=>{ (st.pts||[]).forEach(pt=>{ const d=(pt.fx-fx)**2+(pt.fy-fy)**2; if(d<bd){ bd=d; best={type:'stroke',obj:st}; } }); });
+  return best; }
 
 const TRADES=['HVAC','Wet Services','Fire','General/Other'];
 const PRIORITIES=['Critical','Minor'];
@@ -614,9 +628,9 @@ function applyFirmDefaults(snap){
   if(!snap.logo && FIRM_DEFAULTS.logo && FIRM_DEFAULTS.logo!=='__LOGO_DATA_URL__') snap.logo = FIRM_DEFAULTS.logo;
   return snap;
 }
-function blankSnapshot(){ return applyFirmDefaults({meta:{firm:'',details:'',name:'',no:'',client:'',addr:'',inspector:'',date:new Date().toISOString().slice(0,10),weather:''}, items:[], seq:0, logo:null, plans:[], mode:'snag', reportOpts:{summary:true,plans:true,photos:true,history:true}, v:4}); }
+function blankSnapshot(){ return applyFirmDefaults({meta:{firm:'',details:'',name:'',no:'',client:'',addr:'',inspector:'',date:new Date().toISOString().slice(0,10),weather:''}, items:[], seq:0, logo:null, plans:[], mode:'snag', reportOpts:{summary:true,plans:true,photos:true,history:true}, hidden:[], v:4}); }
 
-function curSnapshot(){ return {meta:meta(), items, seq, logo:logoData, plans, mode:curMode, reportOpts:curReportOpts, v:4}; }
+function curSnapshot(){ return {meta:meta(), items, seq, logo:logoData, plans, mode:curMode, reportOpts:curReportOpts, hidden:[...curHidden], v:4}; }
 function saveCurrentToStore(){ if(store.current){ store.inspections[store.current]=curSnapshot(); } }
 
 let autosaveTimer=null;
@@ -631,6 +645,7 @@ function applySnapshotToForm(d){
   const m=d.meta||{};
   curMode = (d.mode==='survey') ? 'survey' : 'snag';
   curReportOpts = Object.assign({summary:true,plans:true,photos:true,history:true}, d.reportOpts||{});
+  curHidden = new Set(d.hidden||[]);
   setVal('f_firm',m.firm);setVal('f_details',m.details);setVal('p_name',m.name);setVal('p_no',m.no);
   setVal('p_client',m.client);setVal('p_addr',m.addr);setVal('p_inspector',m.inspector);
   setVal('p_date',m.date||new Date().toISOString().slice(0,10));setVal('p_weather',m.weather);
@@ -837,6 +852,7 @@ function updatePlanHint(){ const h=document.getElementById('planHint'); if(!h) r
   const hints={ pin:(lang==='af'?'Tik op die plan om \u2019n fout te pen.':'Tap the plan to drop a snag pin.'),
     symbol:(lang==='af'?'Kies \u2019n simbool, tik dan op die plan. Tik \u2019n simbool om te verwyder.':'Pick a symbol, then tap the plan to place it. Tap a symbol to remove it.'),
     draw:(lang==='af'?'Sleep om vry te teken. Knyp om in te zoem vir presisie.':'Drag to draw freehand. Pinch to zoom in for precision.'),
+    move:(lang==='af'?'Sleep ’n pen, simbool of merk om dit te herposisioneer.':'Drag a pin, symbol or mark to reposition it.'),
     room:(lang==='af'?'Tik om \u2019n kamermerker te plaas; tik naam in.':'Tap to place a room marker, then name it.'),
     zone:(lang==='af'?'Sleep om \u2019n kamerblok te teken.':'Drag to draw a room box.') };
   h.textContent=hints[planMode]||''; }
@@ -990,6 +1006,8 @@ function planPointerDown(ev){
   ptrDown=true; ptrMoved=false; ptrStartX=t.clientX; ptrStartY=t.clientY; panStartTx=planTx; panStartTy=planTy;
   if(planMode==='zone'){ zoneStartF=planRelFraction(t.clientX,t.clientY); }
   if(planMode==='draw'){ const f=planRelFraction(t.clientX,t.clientY); drawStroke={c:penColor,w:penWidth,pts:[f]}; updateLivePath(); }
+  if(planMode==='move'){ const f=planRelFraction(t.clientX,t.clientY); const g=planGrab(f.fx,f.fy);
+    if(g){ moveGrab=g; moveLast=f; moveOrig=(g.type==='stroke')?JSON.parse(JSON.stringify(g.obj.pts)):{fx:g.obj.fx,fy:g.obj.fy}; } }
 }
 function planPointerMove(ev){
   if(curPlanPage<0) return;
@@ -1007,6 +1025,10 @@ function planPointerMove(ev){
   if(Math.abs(dx)>6||Math.abs(dy)>6) ptrMoved=true;
   if(planMode==='draw' && drawStroke){ ev.preventDefault();
     const f=planRelFraction(t.clientX,t.clientY); drawStroke.pts.push(f); updateLivePath(); return; }
+  if(planMode==='move' && moveGrab){ ev.preventDefault(); const f=planRelFraction(t.clientX,t.clientY);
+    if(moveGrab.type==='stroke'){ const dx=f.fx-moveLast.fx, dy=f.fy-moveLast.fy; moveGrab.obj.pts.forEach(pt=>{ pt.fx=Math.min(1,Math.max(0,pt.fx+dx)); pt.fy=Math.min(1,Math.max(0,pt.fy+dy)); }); }
+    else { moveGrab.obj.fx=f.fx; moveGrab.obj.fy=f.fy; }
+    moveLast=f; drawPlanOverlay(); return; }
   if(planMode==='zone' && zoneStartF){ ev.preventDefault();
     const c=planRelFraction(t.clientX,t.clientY);
     zoneDraft={fx:Math.min(zoneStartF.fx,c.fx),fy:Math.min(zoneStartF.fy,c.fy),fw:Math.abs(c.fx-zoneStartF.fx),fh:Math.abs(c.fy-zoneStartF.fy)};
@@ -1022,6 +1044,12 @@ function planPointerUp(ev){
   if(planMode==='draw' && drawStroke){
     const p=plans[curPlanPage]; if(drawStroke.pts.length>1){ if(!p.draws) p.draws=[]; p.draws.push(drawStroke); touch(); }
     drawStroke=null; drawPlanOverlay(); ptrDown=false; ptrMoved=false; return;
+  }
+  if(planMode==='move'){
+    if(moveGrab){ const g=moveGrab, orig=moveOrig;
+      pushUndo(lang==='af'?'skuif merker':'move marker', ()=>{ if(g.type==='stroke') g.obj.pts=orig; else { g.obj.fx=orig.fx; g.obj.fy=orig.fy; } });
+      touch(); drawPlanOverlay(); render(); }
+    moveGrab=null; moveLast=null; moveOrig=null; ptrDown=false; ptrMoved=false; return;
   }
   if(planMode==='zone' && zoneStartF){
     const p=plans[curPlanPage];
@@ -1291,6 +1319,14 @@ function renderReportOpts(){ const el=document.getElementById('rptOpts'); if(!el
 function toggleReportOpt(k){ curReportOpts[k]=!rptOn(k); touch(); renderReportOpts();
   flash(rptOn(k)?(T('rs_'+k)+': '+(lang==='af'?'ingesluit':'included')):(T('rs_'+k)+': '+(lang==='af'?'uitgesluit':'excluded'))); }
 
+/* ===== per-field ✕ : remove a project-detail row from the report ===== */
+const META_FIELDS=[['name','t_pname'],['no','t_pno'],['client','t_client'],['addr','t_addr'],['inspector','t_insp'],['date','t_date'],['weather','t_weather']];
+function renderFieldHides(){ META_FIELDS.forEach(([key,lid])=>{ const lbl=document.getElementById(lid); if(!lbl) return; const field=lbl.parentElement; if(!field) return;
+  let btn=field.querySelector('.fldhide'); if(!btn){ btn=document.createElement('button'); btn.type='button'; btn.className='fldhide'; btn.onclick=(e)=>{ e.preventDefault(); toggleHideField(key); }; field.appendChild(btn); }
+  const hid=curHidden.has(key); btn.textContent=hid?('＋ '+T('rs_addrep')):('✕ '+T('rs_rmrep')); field.classList.toggle('fld-hidden',hid); }); }
+function toggleHideField(key){ if(curHidden.has(key)) curHidden.delete(key); else curHidden.add(key); touch(); renderFieldHides();
+  flash(curHidden.has(key)?(lang==='af'?'Verwyder uit verslag.':'Removed from report.'):(lang==='af'?'In verslag.':'In report.')); }
+
 /* ================= render ================= */
 function itemCard(it){
   const div=document.createElement('div'); div.className='item'+((!isSurvey()&&it.status==='complete')?' closed':'')+(it.excluded?' excluded':'');
@@ -1498,12 +1534,11 @@ async function exportDOC(){
   b+=`<td style="vertical-align:top"><div style="font-size:15pt;font-weight:bold">${esc(m.firm)}</div>`;
   (m.details||'').split('\n').filter(Boolean).forEach(l=>b+=`<div style="font-size:9pt;color:#555">${esc(l)}</div>`);
   b+=`</td></tr></table><hr>`;
-  b+=`<div style="font-size:16pt;font-weight:bold">${esc(T(survey?'pdf_title_survey':'pdf_title'))}</div>`;
-  b+=`<div style="color:#555;margin-bottom:8px">${esc(T(survey?'pdf_sub_survey':'pdf_sub'))}</div>`;
-  // project details
-  const drows=[[L.pname,m.name],[L.pno,m.no],[L.client,m.client],[L.addr,m.addr],[L.insp,m.inspector],[L.date,m.date],[L.weather,m.weather]];
+  b+=`<div style="font-size:16pt;font-weight:bold;margin-bottom:8px">${esc(T(survey?'pdf_title_survey':'pdf_title'))}</div>`;
+  // project details (hidden fields omitted)
+  const drows=[['name',L.pname,m.name],['no',L.pno,m.no],['client',L.client,m.client],['addr',L.addr,m.addr],['inspector',L.insp,m.inspector],['date',L.date,m.date],['weather',L.weather,m.weather]];
   b+=`<table style="border-collapse:collapse">`;
-  drows.forEach(r=>b+=`<tr><td style="font-weight:bold;padding:2px 14px 2px 0">${esc(r[0])}</td><td style="padding:2px 0">${esc(r[1]||'—')}</td></tr>`);
+  drows.forEach(r=>{ if(curHidden.has(r[0])) return; b+=`<tr><td style="font-weight:bold;padding:2px 14px 2px 0">${esc(r[1])}</td><td style="padding:2px 0">${esc(r[2]||'—')}</td></tr>`; });
   b+=`</table>`;
   const TH='background:#1d212b;color:#fff;padding:5px;text-align:left;font-size:9pt';
   const TD='padding:5px;border:1px solid #ccc;font-size:9pt';
@@ -1535,13 +1570,17 @@ async function exportDOC(){
     const tag=[it.trade,it.priority].filter(Boolean).join(' · '); const rl=rlabel(it);
     const metaR=[(rl&&rl!=='—')?rl:'', tag?'['+tag+']':''].filter(Boolean).join(' ');
     b+=`<div style="font-weight:bold;font-size:12pt">${esc(num(it))}${metaR?' — '+esc(metaR):''}</div>`;
-    if(survey) b+=fld(T('pdf_asset'),it.asset);
-    b+=fld(T('pdf_loc'),it.loc); if(it.room) b+=fld(T('room')+':',it.room);
-    b+=fld(T('pdf_logged'),it.ts);
-    if(it.gps) b+=fld('GPS:',`${it.gps.lat.toFixed(5)}, ${it.gps.lng.toFixed(5)} (±${it.gps.acc} m)`);
-    b+=`<div style="margin-top:4px"><b>${esc(T(survey?'pdf_obs':'pdf_notes'))}</b><br>${nl2br(it.notes||'—')}</div>`;
-    if(survey){ b+=`<div style="margin-top:4px"><b>${esc(T('pdf_rec'))}</b><br>${nl2br(it.recommendation||'—')}</div>`;
-      if(it.life) b+=fld(T('pdf_life'),it.life); }
+    // notes/observations prominent first
+    b+=`<div style="margin-top:5px"><b>${esc(T(survey?'pdf_obs':'pdf_notes'))}</b><div style="font-size:11.5pt;margin-top:1px">${nl2br(it.notes||'—')}</div></div>`;
+    if(survey){ b+=`<div style="margin-top:5px"><b>${esc(T('pdf_rec'))}</b><div style="font-size:11.5pt;margin-top:1px">${nl2br(it.recommendation||'—')}</div></div>`; }
+    // compact meta line
+    const meta1=[]; if(survey&&it.asset) meta1.push('<b>'+esc(T('pdf_asset'))+'</b> '+esc(it.asset));
+    meta1.push('<b>'+esc(T('pdf_loc'))+'</b> '+esc(it.loc||'—'));
+    if(it.room) meta1.push('<b>'+esc(T('room'))+':</b> '+esc(it.room));
+    if(survey&&it.life) meta1.push('<b>'+esc(T('pdf_life'))+'</b> '+esc(it.life));
+    meta1.push('<b>'+esc(T('pdf_logged'))+'</b> '+esc(it.ts||'—'));
+    if(it.gps) meta1.push('GPS: '+it.gps.lat.toFixed(5)+', '+it.gps.lng.toFixed(5));
+    b+=`<div style="margin-top:4px;font-size:9pt;color:#555">${meta1.join(' &nbsp;&nbsp; ')}</div>`;
     if(rptOn('history') && it.history&&it.history.length){ b+=`<div style="margin-top:4px;font-size:9pt;color:#555"><i>${lang==='af'?'Statusgeskiedenis':'Status history'}:</i><br>`+it.history.map(h=>`• ${esc(h.ts)}: ${esc(h.from)} &rarr; ${esc(h.to)}`).join('<br>')+`</div>`; }
     if(rptOn('plans') && it.planRef){ const crop=await planCropImage(it);
       if(crop) b+=`<div style="margin-top:4px"><b>Plan: ${esc(planNameById(it.planRef.planId))}</b><br><img src="${crop}" style="width:48%;border:1px solid #ccc"></div>`; }
@@ -1590,13 +1629,12 @@ async function exportPDF(){
   doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(90); let dy=y+10;
   (m.details||'').split('\n').filter(Boolean).forEach(l=>{ doc.text(l,tx,dy); dy+=4; });
   y=Math.max(headBottom,dy,y+12)+3; line(y); y+=7;
-  doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(20); doc.text(T(isSurvey()?'pdf_title_survey':'pdf_title'),M,y); y+=6;
-  doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(90); doc.text(T(isSurvey()?'pdf_sub_survey':'pdf_sub'),M,y); y+=5;
+  doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(20); doc.text(T(isSurvey()?'pdf_title_survey':'pdf_title'),M,y); y+=8;
   const L=I18N[lang];
-  const rows=[[L.pname,m.name],[L.pno,m.no],[L.client,m.client],[L.addr,m.addr],[L.insp,m.inspector],[L.date,m.date],[L.weather,m.weather]];
+  const rows=[['name',L.pname,m.name],['no',L.pno,m.no],['client',L.client,m.client],['addr',L.addr,m.addr],['inspector',L.insp,m.inspector],['date',L.date,m.date],['weather',L.weather,m.weather]];
   doc.setFontSize(9.5);
-  rows.forEach(r=>{ doc.setFont('helvetica','bold'); doc.setTextColor(40); doc.text(r[0],M,y);
-    doc.setFont('helvetica','normal'); doc.setTextColor(20); doc.text(doc.splitTextToSize(r[1]||'—',W-M-58),M+48,y); y+=6; });
+  rows.forEach(r=>{ if(curHidden.has(r[0])) return; doc.setFont('helvetica','bold'); doc.setTextColor(40); doc.text(r[1],M,y);
+    doc.setFont('helvetica','normal'); doc.setTextColor(20); doc.text(doc.splitTextToSize(r[2]||'—',W-M-58),M+48,y); y+=6; });
   y+=1; line(y); y+=8;
   const sl={complete:T('complete').toUpperCase(),incomplete:T('incomplete').toUpperCase(),defect:T('defect').toUpperCase(),'':'—'};
   const rlabel=(it)=> isSurvey() ? (it.condition? T('cond_'+it.condition).toUpperCase() : '—') : (sl[it.status]||'—');
@@ -1656,17 +1694,25 @@ async function exportPDF(){
     doc.text(`${T(isSurvey()?'item_no':'snag_no')} ${String(it.snag).padStart(3,'0')}`,M+2,y); doc.setTextColor(250,200,60);
     const tag=[it.trade,it.priority].filter(Boolean).join(' · '); const rl=rlabel(it);
     doc.text([(rl&&rl!=='—')?rl:'', tag?'['+tag+']':''].filter(Boolean).join('   '),W-M-2,y,{align:'right'}); y+=8; doc.setTextColor(20);
-    const fld=(lbl,txt)=>{ doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.text(lbl,M,y); doc.setFont('helvetica','normal'); const t=doc.splitTextToSize(txt||'—',W-M-30); doc.text(t,M+26,y); y+=5*t.length+1; };
-    if(isSurvey()&&it.asset) fld(T('pdf_asset'),it.asset);
-    fld(T('pdf_loc'),it.loc); fld(T('pdf_logged'),it.ts); if(it.gps) fld('GPS:',`${it.gps.lat.toFixed(5)}, ${it.gps.lng.toFixed(5)} (±${it.gps.acc} m)`);
-    if(it.audio) fld('Audio:',lang==='af'?'(stemmemo in rugsteun)':'(voice memo in backup)');
-    doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.text(T(isSurvey()?'pdf_obs':'pdf_notes'),M,y); y+=5; doc.setFont('helvetica','normal');
-    doc.splitTextToSize(it.notes||'—',W-2*M).forEach(t=>{ ck(6); doc.text(t,M,y); y+=5; });
+    // NOTES / OBSERVATIONS — the key content, shown prominently right under the header
+    doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor(20); doc.text(T(isSurvey()?'pdf_obs':'pdf_notes'),M,y); y+=5.5;
+    doc.setFont('helvetica','normal'); doc.setFontSize(10.5); doc.setTextColor(20);
+    doc.splitTextToSize(it.notes||'—',W-2*M).forEach(t=>{ ck(7); doc.text(t,M,y); y+=5.5; });
     if(isSurvey()){
-      y+=1; doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor(20); doc.text(T('pdf_rec'),M,y); y+=5; doc.setFont('helvetica','normal');
-      doc.splitTextToSize(it.recommendation||'—',W-2*M).forEach(t=>{ ck(6); doc.text(t,M,y); y+=5; });
-      if(it.life) fld(T('pdf_life'), it.life);
+      y+=1.5; doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor(20); doc.text(T('pdf_rec'),M,y); y+=5.5;
+      doc.setFont('helvetica','normal'); doc.setFontSize(10.5); doc.splitTextToSize(it.recommendation||'—',W-2*M).forEach(t=>{ ck(7); doc.text(t,M,y); y+=5.5; });
     }
+    // meta — compact, muted line (location, logged, etc.)
+    y+=1.5; doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(110);
+    const meta1=[];
+    if(isSurvey()&&it.asset) meta1.push(T('pdf_asset')+' '+it.asset);
+    meta1.push(T('pdf_loc')+' '+(it.loc||'—'));
+    if(isSurvey()&&it.life) meta1.push(T('pdf_life')+' '+it.life);
+    meta1.push(T('pdf_logged')+' '+(it.ts||'—'));
+    if(it.gps) meta1.push('GPS: '+it.gps.lat.toFixed(5)+', '+it.gps.lng.toFixed(5));
+    if(it.audio) meta1.push(lang==='af'?'(stemmemo)':'(voice memo)');
+    doc.splitTextToSize(meta1.join('      '),W-2*M).forEach(t=>{ ck(5); doc.text(t,M,y); y+=4.2; });
+    doc.setTextColor(20);
     if(rptOn('history') && it.history&&it.history.length){ y+=1; doc.setFont('helvetica','italic'); doc.setFontSize(8); doc.setTextColor(110); doc.text('Status history:',M,y); y+=4;
       it.history.forEach(h=>{ ck(5); doc.text(`• ${h.ts}: ${h.from} → ${h.to}`,M+3,y); y+=4; }); doc.setTextColor(20); }
     if(cells.length){ y+=2;
