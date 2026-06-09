@@ -1725,15 +1725,15 @@ async function exportPDF(){
     if(it.audio) meta1.push(lang==='af'?'(stemmemo)':'(voice memo)');
     doc.splitTextToSize(meta1.join('      '),W-2*M).forEach(t=>{ ck(5); doc.text(t,M,y); y+=4.2; });
     doc.setTextColor(20);
-    if(rptOn('history') && it.history&&it.history.length){ y+=1; doc.setFont('helvetica','italic'); doc.setFontSize(8); doc.setTextColor(110); doc.text('Status history:',M,y); y+=4;
-      it.history.forEach(h=>{ ck(5); doc.text(`• ${h.ts}: ${h.from} → ${h.to}`,M+3,y); y+=4; }); doc.setTextColor(20); }
+    if(rptOn('history') && it.history&&it.history.length){ y+=1; doc.setFont('helvetica','italic'); doc.setFontSize(8.5); doc.setTextColor(110); doc.text('Status history:',M,y); y+=4;
+      it.history.forEach(h=>{ ck(5); doc.text(`- ${h.ts}: ${h.from} -> ${h.to}`,M+3,y); y+=4; }); doc.setTextColor(20); }
     if(cells.length){ y+=2;
       if(cells[0]&&cells[0].plan){ doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(90); doc.text('Plan: '+planNameById(it.planRef.planId),M,y); y+=3.5; doc.setTextColor(20); }
       let col=0,rowH=0; for(const c of cells){ if(col===0) ck(c.h+6); const x=M+col*(PW+6); const dx=x+(PW-c.w)/2;
         try{ doc.addImage(c.src,'JPEG',dx,y,c.w,c.h); }catch(e){} doc.setDrawColor(c.plan?140:200); doc.setLineWidth(0.2); doc.rect(dx,y,c.w,c.h); rowH=Math.max(rowH,c.h); col++; if(col===2){ y+=rowH+5; col=0; rowH=0; } }
       if(col===1) y+=rowH+5; }
     // logged time at the END of the snag (optional)
-    if(rptOn('logged') && it.ts){ y+=1.5; doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120); doc.text(T('pdf_logged')+' '+it.ts,M,y); y+=4; doc.setTextColor(20); }
+    if(rptOn('logged') && it.ts){ y+=1.5; doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(120); doc.text(T('pdf_logged')+' '+it.ts,M,y); y+=4; doc.setTextColor(20); }
     y+=2; line(y,true); y+=6;
    }
   }
@@ -1743,7 +1743,7 @@ async function exportPDF(){
   if(rptOn('plans')) for(let pi=0; pi<plans.length; pi++){ const pl=plans[pi]; const isLastPlan=pi===plans.length-1;
     const pinned=items.filter(it=>it.planRef&&it.planRef.planId===pl.id&&inRep(it));
     doc.addPage(); y=M;
-    doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(20);
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20);
     doc.text(T('pdf_refplan')+': '+(pl.name||'Plan'),M,y); y+=6;
     // leave room for the sign-off on the last plan page so it fits on this page
     const reserve=(isLastPlan && m.inspector)?50:8;
@@ -1778,26 +1778,26 @@ async function exportPDF(){
       doc.setTextColor(255); doc.setFont('helvetica','bold'); doc.setFontSize(5.5);
       doc.text(String(it.snag).padStart(2,'0'),px,py+0.9,{align:'center'}); });
     y=oy+dh+6;
-    if(pinned.length){ doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(90);
+    if(pinned.length){ doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(90);
       const legend=pinned.sort((a,b)=>a.snag-b.snag).map(it=>`${String(it.snag).padStart(3,'0')}: ${it.room||it.loc||'—'}`).join('    ');
       doc.splitTextToSize(legend,W-2*M).forEach(l=>{ ck(5); doc.text(l,M,y); y+=4; }); }
     // symbol legend, grouped by discipline
     const syms=pl.symbols||[];
-    if(syms.length){ y+=1; doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(90);
+    if(syms.length){ y+=1; doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(90);
       const byDisc={}; syms.forEach(s=>{ (byDisc[s.disc]=byDisc[s.disc]||new Set()).add(s.k); });
       Object.keys(byDisc).forEach(d=>{ const codes=[...byDisc[d]].map(k=>k+' = '+symLabel(d,k)).join(';  ');
         doc.splitTextToSize(MEP_SYMBOLS[d].name+'  —  '+codes, W-2*M).forEach(l=>{ ck(5); doc.text(l,M,y); y+=4; }); }); }
     // sign-off fits on the (last) reference-plan page
     if(isLastPlan && m.inspector){ y+=5; line(y,true); y+=8;
       doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20); doc.text(T('pdf_signoff'),M,y); y+=10;
-      doc.setDrawColor(120); doc.setLineWidth(0.3); doc.line(M,y,M+70,y); doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(60);
+      doc.setDrawColor(120); doc.setLineWidth(0.3); doc.line(M,y,M+70,y); doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(60);
       doc.text(lang==='af'?'Inspekteur (handtekening)':'Inspector (signature)',M,y+5); doc.text(`${lang==='af'?'Naam':'Name'}:  ${m.inspector}`,M,y+12); doc.text(`${lang==='af'?'Datum':'Date'}:  ${m.date||''}`,M,y+18);
       signedOff=true; }
   }
 
   if(m.inspector && !signedOff){ y+=4; if(y+40>H-20){ doc.addPage(); y=M; } else { line(y,true); y+=8; }
     doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20); doc.text(T('pdf_signoff'),M,y); y+=10;
-    doc.setDrawColor(120); doc.setLineWidth(0.3); doc.line(M,y,M+70,y); doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(60);
+    doc.setDrawColor(120); doc.setLineWidth(0.3); doc.line(M,y,M+70,y); doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(60);
     doc.text(lang==='af'?'Inspekteur (handtekening)':'Inspector (signature)',M,y+5); doc.text(`${lang==='af'?'Naam':'Name'}:  ${m.inspector}`,M,y+12); doc.text(`${lang==='af'?'Datum':'Date'}:  ${m.date||''}`,M,y+18); }
   const pages=doc.getNumberOfPages();
   for(let p=1;p<=pages;p++){ doc.setPage(p); doc.setFontSize(8); doc.setTextColor(120);
