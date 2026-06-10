@@ -446,7 +446,7 @@ const I18N={
     cam_flip:'Flip',cam_shoot:'Capture',cam_close:'Close',
     word:'Word',phrases:'Phrases',phradd:'Add',phrclose:'Close',phrnew:'Add a phrase…',
     rpt_included:'In report — tap to exclude',rpt_excluded:'Excluded — tap to include',rpt_tag:'✕ not in report',
-    undo:'Undo',editno:'Tap to edit number',renum:'⇅ Renumber 1..N',
+    undo:'Undo',editno:'Tap to edit number',renum:'⇅ Renumber 1..N',clearhist:'Clear history',
     rs_h:'Report sections',rs_hint:'Toggle which sections appear in the PDF / Word report.',
     rs_summary:'Summary',rs_plans:'Plan pages',rs_photos:'Photos',rs_history:'History',rs_logged:'Logged time',rs_group:'Group by room',rs_noroom:'No room',rs_rmrep:'report',rs_addrep:'report',
     rs_f_system:'System',rs_f_specref:'Spec ref',rs_f_close:'Target close',rs_f_source:'Carried-from ref',rs_f_cf:'Carried-forward items',rs_f_contractor:'Contractor sign-off',
@@ -486,7 +486,7 @@ const I18N={
     cam_flip:'Wissel',cam_shoot:'Neem',cam_close:'Sluit',
     word:'Word',phrases:'Frases',phradd:'Voeg by',phrclose:'Sluit',phrnew:'Voeg ’n frase by…',
     rpt_included:'In verslag — tik om uit te sluit',rpt_excluded:'Uitgesluit — tik om in te sluit',rpt_tag:'✕ nie in verslag',
-    undo:'Ontdoen',editno:'Tik om nommer te wysig',renum:'⇅ Hernommer 1..N',
+    undo:'Ontdoen',editno:'Tik om nommer te wysig',renum:'⇅ Hernommer 1..N',clearhist:'Wis geskiedenis',
     rs_h:'Verslag-afdelings',rs_hint:'Kies watter afdelings in die PDF / Word-verslag verskyn.',
     rs_summary:'Opsomming',rs_plans:'Planbladsye',rs_photos:'Foto’s',rs_history:'Geskiedenis',rs_logged:'Gelog-tyd',rs_group:'Groepeer per kamer',rs_noroom:'Geen kamer',rs_rmrep:'verslag',rs_addrep:'verslag',
     rs_f_system:'Stelsel',rs_f_specref:'Spes-verw',rs_f_close:'Teiken sluit',rs_f_source:'Oorgedra-verw',rs_f_cf:'Oorgedra items',rs_f_contractor:'Kontrakteur-ondertekening',
@@ -788,6 +788,11 @@ function carryForward(){
   loadCurrentFromStore(); render(); renderInspSelector(); persistStore();
   flash(lang==='af'?'Herinspeksie geskep met uitstaande items.':'Re-inspection created with outstanding items.');
 }
+function clearHistory(id){ const it=items.find(i=>i.id===id); if(!it||!it.history||!it.history.length) return;
+  if(!confirm(lang==='af'?'Verwyder statusgeskiedenis vir hierdie item?':'Clear status history for this item?')) return;
+  const prev=it.history; it.history=[];
+  pushUndo(lang==='af'?'wis geskiedenis':'clear history', ()=>{ const x=items.find(i=>i.id===id); if(x) x.history=prev; });
+  touch(); render(); }
 function setStatus(id,val){ const it=items.find(i=>i.id===id); if(!it) return; const old=it.status;
   it.status=(it.status===val)?'':val; if(it.status&&it.status!==old){ it.history.push({ts:nowStamp(),from:old||'(none)',to:it.status}); } touch(); render(); }
 // ----- carried-forward sub-items (parent/child) -----
@@ -1397,7 +1402,7 @@ function itemCard(it){
   const div=document.createElement('div'); div.className='item'+((!isSurvey()&&isClosed(it))?' closed':'')+(it.excluded?' excluded':'');
   const photoHtml=it.photos.map((p,pi)=>`<div class="thumb"><img src="${p}"><button class="x" onclick="delPhoto(${js(it.id)},${pi})">&times;</button><button class="edit" onclick="openAnnot(${js(it.id)},${pi})">${T('markup')}</button></div>`).join('');
   const gpsHtml=it.gps?`<span class="coord">${it.gps.lat.toFixed(5)}, ${it.gps.lng.toFixed(5)} (±${it.gps.acc}m)</span><button onclick="captureGPS(${js(it.id)})">${T('update')}</button>`:`<button onclick="captureGPS(${js(it.id)})">📍 ${T('capgps')}</button>`;
-  const histHtml=it.history&&it.history.length?`<div class="hist">${it.history.map(h=>`<div class="h-line">${h.ts} — <b>${h.from} → ${h.to}</b></div>`).join('')}</div>`:'';
+  const histHtml=it.history&&it.history.length?`<div class="hist"><div style="display:flex;justify-content:flex-end;margin-bottom:3px"><button class="recbtn" style="padding:2px 9px;font-size:11px;min-height:auto" onclick="clearHistory(${js(it.id)})" title="${T('clearhist')}">✕ ${T('clearhist')}</button></div>${it.history.map(h=>`<div class="h-line">${h.ts} — <b>${h.from} → ${h.to}</b></div>`).join('')}</div>`:'';
   const audioHtml=it.audio?`<div class="audio-row"><audio controls src="${it.audio}"></audio><button class="recbtn" onclick="delAudio(${js(it.id)})">✕</button></div>`:`<div class="audio-row"><button class="recbtn" id="rec_${it.id}" data-rec="0" onclick="toggleAudio(${js(it.id)})">🎙 ${T('recmemo')}</button></div>`;
   const tradeOpts=['<option value="">— '+(isSurvey()?T('system'):T('trade'))+' —</option>'].concat(tradeList().map(t=>`<option value="${t}"${it.trade===t?' selected':''}>${t}</option>`)).join('');
   const prioOpts=['<option value="">— '+(isSurvey()?T('timeframe'):T('severity'))+' —</option>'].concat(prioList().map(p=>`<option value="${p}"${it.priority===p?' selected':''}>${p}</option>`)).join('');
