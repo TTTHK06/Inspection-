@@ -289,6 +289,7 @@
       <div class="field"><label id="t_insp">Inspector</label><input id="p_inspector" oninput="touch()" placeholder="Name &amp; designation"></div>
       <div class="field"><label id="t_date">Inspection Date</label><input id="p_date" type="date" oninput="touch()"></div>
       <div class="field full"><label id="t_weather">Weather / Site Conditions</label><input id="p_weather" oninput="touch()" placeholder="e.g. Clear, 22°C, dry"></div>
+      <div class="field full"><label id="t_contractor">Contractor (for acknowledgement)</label><input id="p_contractor" oninput="touch()" placeholder="Contractor name (optional)"></div>
     </div>
   </section>
 
@@ -437,6 +438,8 @@ const I18N={
     date:'Inspection Date',weather:'Weather / Site Conditions',additem:'＋ Add Inspection Item',
     backup:'Backup',restore:'Restore',csv:'CSV',pdf:'PDF',new:'New',dup:'Duplicate',delinsp:'Delete',
     closed:'Closed Items',complete:'Complete',incomplete:'Incomplete',defect:'Defect',
+    st_open:'Open',st_ongoing:'Ongoing',st_carried:'Carried-forward',st_closed:'Closed',
+    cf_h:'Carried-forward items',cf_add:'＋ Add sub-item',cf_ref:'Ref / ID',cf_disc:'Discipline',cf_status:'Status',cf_closeout:'Close-out',cf_src:'Source ref',pdf_cf:'Carried-forward items',
     loc:'Location / Area',trade:'Trade / Discipline',priority:'Priority',notes:'Notes',
     dictate:'Dictate',stop:'Stop',photos:'Photos',camera:'Camera',gallery:'Gallery',
     cam_flip:'Flip',cam_shoot:'Capture',cam_close:'Close',
@@ -459,6 +462,8 @@ const I18N={
     mode:'Mode',mode_snag:'Snag list',mode_survey:'Condition survey',sub_survey:'Condition survey · existing building · PDF report',
     condition:'Condition (CIBSE A–D)',cond_A:'A · Good',cond_B:'B · Satisf.',cond_C:'C · Poor',cond_D:'D · End-of-life',cond_ni:'N/I',
     system:'System',asset:'Asset / equipment',timeframe:'Action / timeframe',observations:'Observations',life:'Remaining life',
+    severity:'Severity',specref:'Spec reference',closedate:'Target close date',sourceref:'Carried-forward from',contractor:'Contractor (for acknowledgement)',
+    pdf_specref:'Spec ref:',pdf_close:'Target close:',pdf_source:'Carried from:',pdf_contractor:'Contractor acknowledgement',
     recommendation:'Recommendation',cost:'Est. cost (R)',additem_survey:'＋ Add Survey Element',
     snag_no:'SNAG',item_no:'ITEM',
     pdf_title_survey:'BUILDING CONDITION SURVEY',pdf_sub_survey:'Existing building — condition assessment record',
@@ -472,6 +477,8 @@ const I18N={
     date:'Inspeksiedatum',weather:'Weer / Terreintoestande',additem:'＋ Voeg Inspeksie-item By',
     backup:'Rugsteun',restore:'Herstel',csv:'CSV',pdf:'PDF',new:'Nuut',dup:'Dupliseer',delinsp:'Skrap',
     closed:'Voltooide Items',complete:'Voltooi',incomplete:'Onvoltooi',defect:'Gebrek',
+    st_open:'Oop',st_ongoing:'Aan die gang',st_carried:'Oorgedra',st_closed:'Gesluit',
+    cf_h:'Oorgedra items',cf_add:'＋ Voeg sub-item by',cf_ref:'Verw / ID',cf_disc:'Dissipline',cf_status:'Status',cf_closeout:'Afhandeling',cf_src:'Bron-verw',pdf_cf:'Oorgedra items',
     loc:'Ligging / Area',trade:'Vakgebied',priority:'Prioriteit',notes:'Notas',
     dictate:'Dikteer',stop:'Stop',photos:'Foto\u2019s',camera:'Kamera',gallery:'Galery',
     cam_flip:'Wissel',cam_shoot:'Neem',cam_close:'Sluit',
@@ -494,6 +501,8 @@ const I18N={
     mode:'Modus',mode_snag:'Foutlys',mode_survey:'Toestandsopname',sub_survey:'Toestandsopname · bestaande gebou · PDF-verslag',
     condition:'Toestand (CIBSE A–D)',cond_A:'A · Goed',cond_B:'B · Redelik',cond_C:'C · Swak',cond_D:'D · Einde-lewe',cond_ni:'N/G',
     system:'Stelsel',asset:'Bate / toerusting',timeframe:'Aksie / tydraam',observations:'Waarnemings',life:'Oorblywende lewe',
+    severity:'Felheid',specref:'Spesifikasie-verwysing',closedate:'Teiken sluitdatum',sourceref:'Oorgedra vanaf',contractor:'Kontrakteur (vir erkenning)',
+    pdf_specref:'Spes-verw:',pdf_close:'Teiken sluit:',pdf_source:'Oorgedra van:',pdf_contractor:'Kontrakteur-erkenning',
     recommendation:'Aanbeveling',cost:'Beraamde koste (R)',additem_survey:'＋ Voeg Opname-element By',
     snag_no:'FOUT',item_no:'ITEM',
     pdf_title_survey:'GEBOU TOESTANDSOPNAME',pdf_sub_survey:'Bestaande gebou — toestandbeoordelingsrekord',
@@ -512,7 +521,7 @@ function applyLang(){
   set('t_firm_h','firm_h');set('t_logo','logo');set('t_uplogo','uplogo');set('t_rmlogo','rmlogo');
   set('t_firmname','firmname');set('t_firmdet','firmdet');set('t_proj_h','proj_h');
   set('t_pname','pname');set('t_pno','pno');set('t_client','client');set('t_addr','addr');
-  set('t_insp','insp');set('t_date','date');set('t_weather','weather');
+  set('t_insp','insp');set('t_date','date');set('t_weather','weather');set('t_contractor','contractor');
   { const ai=document.getElementById('t_additem'); if(ai) ai.textContent=T(isSurvey()?'additem_survey':'additem'); }
   set('t_rs_h','rs_h');set('t_rs_hint','rs_hint');
   set('t_projbtn','projbtn');set('t_proj_modal_h','proj_modal_h');set('t_proj_save','proj_save');set('t_proj_import','proj_import');set('t_proj_export','proj_export');set('t_proj_close','proj_close');
@@ -577,7 +586,22 @@ function planGrab(fx,fy){ const p=plans[curPlanPage]; if(!p) return null; let be
   return best; }
 
 const TRADES=['HVAC','Wet Services','Fire','General/Other'];
-const PRIORITIES=['Critical','Minor'];
+const PRIORITIES=['Critical','Major','Minor'];   // severity (snag mode)
+// workflow / lifecycle status (snag mode) — a SEPARATE axis from severity.
+// open = outstanding, ongoing = in progress, carried = carried-forward to a re-inspection, closed = resolved
+const STATUSES=['open','ongoing','carried','closed'];
+function statusLabel(s){ return s?T('st_'+s):'—'; }
+// migrate the legacy 3-state status (complete/incomplete/defect) to the lifecycle enum
+function migrateStatus(s){ return ({complete:'closed',incomplete:'ongoing',defect:'open'})[s] || (STATUSES.includes(s)?s:(s||'')); }
+const isClosed=it=>it.status==='closed';
+const isOutstanding=it=>!!it.status && it.status!=='closed';   // open/ongoing/carried
+// render-time text tidy: collapse spaces, fix space-before-punctuation, normalise stray hyphens to en-dash
+function normText(s){ if(s==null) return ''; return String(s)
+  .replace(/[ \t]+/g,' ')
+  .replace(/ +([,.;:!?])/g,'$1')
+  .replace(/(\w)-\s+/g,'$1 – ')
+  .replace(/\s+-\s+/g,' – ')
+  .replace(/[ \t]+\n/g,'\n').trim(); }
 // ----- condition survey (mechanical building services) vocab -----
 const CONDITIONS=['A','B','C','D','ni'];   // CIBSE Guide M condition grades A–D + Not Inspected
 const SYSTEMS=['HVAC','Ventilation','Heating','Cooling','Domestic Water','Drainage','Fire Protection','BMS / Controls','Gas','Other'];
@@ -668,8 +692,9 @@ function applySnapshotToForm(d){
   curHidden = new Set(d.hidden||[]);
   setVal('f_firm',m.firm);setVal('f_details',m.details);setVal('p_name',m.name);setVal('p_no',m.no);
   setVal('p_client',m.client);setVal('p_addr',m.addr);setVal('p_inspector',m.inspector);
-  setVal('p_date',m.date||new Date().toISOString().slice(0,10));setVal('p_weather',m.weather);
-  items=(d.items||[]).map(it=>Object.assign({trade:'',priority:'',gps:null,history:[],snag:0,audio:null,room:'',planRef:null,condition:'',recommendation:'',asset:'',life:'',excluded:false},it));
+  setVal('p_date',m.date||new Date().toISOString().slice(0,10));setVal('p_weather',m.weather);setVal('p_contractor',m.contractor);
+  items=(d.items||[]).map(it=>{ const o=Object.assign({trade:'',priority:'',gps:null,history:[],snag:0,audio:null,room:'',planRef:null,condition:'',recommendation:'',asset:'',life:'',excluded:false,system:'',specref:'',closedate:'',sourceref:'',children:[]},it);
+    o.status=migrateStatus(o.status); if(!Array.isArray(o.children)) o.children=[]; return o; });
   seq=d.seq || items.reduce((mx,i)=>Math.max(mx,i.snag||0),0);
   logoData=d.logo||null; renderLogo();
   plans=(d.plans||[]).map(p=>Object.assign({id:'',name:'',img:'',w:0,h:0,rooms:[],zones:[],symbols:[],draws:[]},p));
@@ -706,7 +731,7 @@ function deleteInspection(){
 /* ================= items ================= */
 function addItem(data){
   if(data){ items.push(data); }
-  else{ seq++; items.push({id:uid(),snag:seq,loc:'',asset:'',life:'',status:'',condition:'',recommendation:'',trade:'',priority:'',notes:'',photos:[],audio:null,gps:null,ts:nowStamp(),history:[]}); }
+  else{ seq++; items.push({id:uid(),snag:seq,loc:'',asset:'',life:'',system:'',specref:'',closedate:'',sourceref:'',status:'',condition:'',recommendation:'',trade:'',priority:'',notes:'',photos:[],audio:null,gps:null,ts:nowStamp(),history:[],children:[]}); }
   touch(); render();
 }
 function delItem(id){ if(!confirm(lang==='af'?'Skrap hierdie item?':'Delete this item?')) return;
@@ -742,7 +767,7 @@ function dupItem(id){ const src=items.find(i=>i.id===id); if(!src) return;
 function carryForward(){
   saveCurrentToStore();
   const src=store.inspections[store.current]; const m=src.meta||{};
-  const open=(src.items||[]).filter(i=>i.status!=='complete');
+  const open=(src.items||[]).filter(i=>i.status!=='closed');
   if(!open.length){ flash(lang==='af'?'Geen uitstaande items om oor te dra nie.':'No outstanding items to carry forward.'); return; }
   if(!confirm(lang==='af'?`Skep nuwe herinspeksie met ${open.length} uitstaande item(s)?`:`Create a new re-inspection with ${open.length} outstanding item(s)?`)) return;
   // build new snapshot: same project/firm meta, fresh date, only open items renumbered from 1, history seeded
@@ -750,7 +775,9 @@ function carryForward(){
   let ns=1;
   const carried=open.map(it=>{ const c=JSON.parse(JSON.stringify(it));
     c.id=uid(); c.snag=ns++;
-    c.history=(c.history||[]).concat([{ts:nowStamp(),from:c.status||'(none)',to:'re-inspect'}]);
+    c.history=(c.history||[]).concat([{ts:nowStamp(),from:c.status||'(none)',to:'carried'}]);
+    c.sourceref=c.sourceref||((m.no?m.no+' ':'')+'#'+String(it.snag).padStart(3,'0')+(m.date?' · '+m.date:''));
+    c.status='carried';
     return c; });
   const snap={ meta:Object.assign({},m,{date:today, name:(m.name||'')+(lang==='af'?' (herinspeksie)':' (re-inspection)')}),
     items:carried, seq:carried.length, logo:src.logo||null, plans:JSON.parse(JSON.stringify(src.plans||[])), mode:src.mode||'snag', v:4 };
@@ -760,6 +787,14 @@ function carryForward(){
 }
 function setStatus(id,val){ const it=items.find(i=>i.id===id); if(!it) return; const old=it.status;
   it.status=(it.status===val)?'':val; if(it.status&&it.status!==old){ it.history.push({ts:nowStamp(),from:old||'(none)',to:it.status}); } touch(); render(); }
+// ----- carried-forward sub-items (parent/child) -----
+function cid(){ return 'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,5); }
+function addChild(id){ const it=items.find(i=>i.id===id); if(!it) return; if(!Array.isArray(it.children)) it.children=[];
+  it.children.push({cid:cid(),ref:'',disc:'',status:'open',closeout:'',sourceref:''}); touch(); render(); }
+function delChild(id,c){ const it=items.find(i=>i.id===id); if(!it||!Array.isArray(it.children)) return;
+  it.children=it.children.filter(x=>x.cid!==c); touch(); render(); }
+function bindChild(id,c,key,el){ const it=items.find(i=>i.id===id); if(!it||!Array.isArray(it.children)) return;
+  const ch=it.children.find(x=>x.cid===c); if(ch){ ch[key]=el.value; touch(); } }
 function setCondition(id,val){ const it=items.find(i=>i.id===id); if(!it) return; const old=it.condition||'';
   it.condition=(it.condition===val)?'':val;
   if(it.condition&&it.condition!==old){ it.history.push({ts:nowStamp(),from:old?T('cond_'+old):'(none)',to:T('cond_'+it.condition)}); }
@@ -778,10 +813,10 @@ function updateModeBar(){ document.querySelectorAll('#modeSeg .seg-btn').forEach
 function ratingVal(it){ return isSurvey()? (it.condition||'') : (it.status||''); }
 function ratingHex(it){ const v=ratingVal(it);
   if(isSurvey()) return v==='D'?'#ef4444':v==='C'?'#f59e0b':v==='B'?'#facc15':v==='A'?'#22c55e':v==='ni'?'#64748b':'#0ea5e9';
-  return v==='defect'?'#ef4444':v==='incomplete'?'#f59e0b':v==='complete'?'#22c55e':'#ff7a18'; }
+  return v==='open'?'#ef4444':v==='ongoing'?'#f59e0b':v==='carried'?'#0ea5e9':v==='closed'?'#22c55e':'#ff7a18'; }
 function ratingRGB(it){ const v=ratingVal(it);
   if(isSurvey()) return v==='D'?[239,68,68]:v==='C'?[245,158,11]:v==='B'?[250,204,21]:v==='A'?[34,197,94]:v==='ni'?[100,116,139]:[14,165,233];
-  return v==='defect'?[239,68,68]:v==='incomplete'?[245,158,11]:v==='complete'?[34,197,94]:[255,122,24]; }
+  return v==='open'?[239,68,68]:v==='ongoing'?[245,158,11]:v==='carried'?[14,165,233]:v==='closed'?[34,197,94]:[255,122,24]; }
 function bind(id,key,el){ const it=items.find(i=>i.id===id); if(it) it[key]=el.value; if(key==='loc') updateLocLabel(id,el.value); touch(); }
 function updateLocLabel(id,val){ const lbl=document.getElementById('loclbl_'+id); if(lbl) lbl.textContent=val||'(no location set)'; }
 
@@ -1010,7 +1045,7 @@ function placePin(fx,fy){ const p=plans[curPlanPage]; if(!p) return;
     p.rooms.push({name:name.trim(),fx,fy}); touch(); drawPlanOverlay(); renderRoomList(); return; }
   // pin mode
   seq++; const room=nearestRoom(p,fx,fy)||'';
-  const it={id:uid(),snag:seq,loc:room,room,status:'',trade:'',priority:'',notes:'',photos:[],audio:null,gps:null,ts:nowStamp(),history:[],planRef:{planId:p.id,fx,fy}};
+  const it={id:uid(),snag:seq,loc:room,room,status:'',trade:'',priority:'',notes:'',photos:[],audio:null,gps:null,ts:nowStamp(),history:[],children:[],planRef:{planId:p.id,fx,fy}};
   items.push(it); touch(); drawPlanOverlay(); render();
   flash((lang==='af'?'Fout gepen: SNAG ':'Pinned SNAG ')+String(seq).padStart(3,'0')+(room?(' ('+room+')'):'')); }
 
@@ -1329,10 +1364,10 @@ function passesFilter(it){ const rv=isSurvey()?(it.condition||''):(it.status||''
   if(activeFilters.trade.size&&!activeFilters.trade.has(it.trade)) return false;
   if(activeFilters.priority.size&&!activeFilters.priority.has(it.priority)) return false; return true; }
 function renderFilters(){ const f=document.getElementById('filters');
-  const ratingVals=isSurvey()?CONDITIONS:['complete','incomplete','defect'];
+  const ratingVals=isSurvey()?CONDITIONS:STATUSES;
   const groups=[['status',ratingVals],['trade',tradeList()],['priority',prioList()]]; let html='';
   groups.forEach(([g,vals])=>vals.forEach(v=>{ const on=activeFilters[g].has(v)?1:0;
-    const lbl=(g==='status')?(isSurvey()?T('cond_'+v):T(v)):v;
+    const lbl=(g==='status')?(isSurvey()?T('cond_'+v):statusLabel(v)):v;
     html+=`<div class="fchip" data-on="${on}" onclick="toggleFilter('${g}','${v.replace(/'/g,"\\'")}')">${lbl}</div>`; })); f.innerHTML=html; }
 function renderReportOpts(){ const el=document.getElementById('rptOpts'); if(!el) return;
   el.innerHTML=REPORT_SECTIONS.map(k=>`<div class="fchip" data-on="${rptOn(k)?1:0}" onclick="toggleReportOpt('${k}')">${escHtml(T('rs_'+k))}</div>`).join('')
@@ -1356,18 +1391,43 @@ function toggleHideField(key){ if(curHidden.has(key)) curHidden.delete(key); els
 
 /* ================= render ================= */
 function itemCard(it){
-  const div=document.createElement('div'); div.className='item'+((!isSurvey()&&it.status==='complete')?' closed':'')+(it.excluded?' excluded':'');
+  const div=document.createElement('div'); div.className='item'+((!isSurvey()&&isClosed(it))?' closed':'')+(it.excluded?' excluded':'');
   const photoHtml=it.photos.map((p,pi)=>`<div class="thumb"><img src="${p}"><button class="x" onclick="delPhoto(${js(it.id)},${pi})">&times;</button><button class="edit" onclick="openAnnot(${js(it.id)},${pi})">${T('markup')}</button></div>`).join('');
   const gpsHtml=it.gps?`<span class="coord">${it.gps.lat.toFixed(5)}, ${it.gps.lng.toFixed(5)} (±${it.gps.acc}m)</span><button onclick="captureGPS(${js(it.id)})">${T('update')}</button>`:`<button onclick="captureGPS(${js(it.id)})">📍 ${T('capgps')}</button>`;
   const histHtml=it.history&&it.history.length?`<div class="hist">${it.history.map(h=>`<div class="h-line">${h.ts} — <b>${h.from} → ${h.to}</b></div>`).join('')}</div>`:'';
   const audioHtml=it.audio?`<div class="audio-row"><audio controls src="${it.audio}"></audio><button class="recbtn" onclick="delAudio(${js(it.id)})">✕</button></div>`:`<div class="audio-row"><button class="recbtn" id="rec_${it.id}" data-rec="0" onclick="toggleAudio(${js(it.id)})">🎙 ${T('recmemo')}</button></div>`;
   const tradeOpts=['<option value="">— '+(isSurvey()?T('system'):T('trade'))+' —</option>'].concat(tradeList().map(t=>`<option value="${t}"${it.trade===t?' selected':''}>${t}</option>`)).join('');
-  const prioOpts=['<option value="">— '+(isSurvey()?T('timeframe'):T('priority'))+' —</option>'].concat(prioList().map(p=>`<option value="${p}"${it.priority===p?' selected':''}>${p}</option>`)).join('');
+  const prioOpts=['<option value="">— '+(isSurvey()?T('timeframe'):T('severity'))+' —</option>'].concat(prioList().map(p=>`<option value="${p}"${it.priority===p?' selected':''}>${p}</option>`)).join('');
+  // optional traceability fields (both modes); System snag-only (survey already uses discipline-as-system)
+  const detailFields = `
+      ${isSurvey()?'':`<div class="field"><label>${T('system')}</label><input value="${escAttr(it.system||'')}" oninput="bind(${js(it.id)},'system',this)" placeholder="e.g. Fire water, Medical gas (optional)"></div>`}
+      <div class="grid2">
+        <div class="field"><label>${T('specref')}</label><input value="${escAttr(it.specref||'')}" oninput="bind(${js(it.id)},'specref',this)" placeholder="Doc no. + clause (optional)"></div>
+        <div class="field"><label>${T('closedate')}</label><input type="date" value="${escAttr(it.closedate||'')}" oninput="bind(${js(it.id)},'closedate',this)"></div>
+      </div>
+      <div class="field"><label>${T('sourceref')}</label><input value="${escAttr(it.sourceref||'')}" oninput="bind(${js(it.id)},'sourceref',this)" placeholder="e.g. Item 7 · list 2026-05-07 (optional)"></div>`;
   // rating chips: condition grade (survey) or status (snag)
   const ratingLabel = isSurvey()? T('condition') : 'Status';
   const ratingChipsHtml = isSurvey()
     ? CONDITIONS.map(c=>`<div class="chip" data-v="${c}" data-on="${it.condition===c?1:0}" onclick="setCondition(${js(it.id)},'${c}')">${T('cond_'+c)}</div>`).join('')
-    : ['complete','incomplete','defect'].map(s=>`<div class="chip" data-v="${s}" data-on="${it.status===s?1:0}" onclick="setStatus(${js(it.id)},'${s}')">${T(s)}</div>`).join('');
+    : STATUSES.map(s=>`<div class="chip" data-v="${s}" data-on="${it.status===s?1:0}" onclick="setStatus(${js(it.id)},'${s}')">${statusLabel(s)}</div>`).join('');
+  // carried-forward sub-items (snag mode): a compact editable table; report counts derive from this same array
+  const childStatusOpts=ch=>['<option value="">—</option>'].concat(STATUSES.map(s=>`<option value="${s}"${ch.status===s?' selected':''}>${statusLabel(s)}</option>`)).join('');
+  const kids=Array.isArray(it.children)?it.children:[];
+  const childrenHtml = isSurvey() ? '' : `
+      <div class="field"><div class="notes-head"><label>${T('cf_h')}${kids.length?' ('+kids.length+')':''}</label>
+        <button class="mic" onclick="addChild(${js(it.id)})">${T('cf_add')}</button></div>
+        ${kids.length?`<div class="cf-list">`+kids.map(ch=>`
+          <div class="cf-row" style="display:grid;grid-template-columns:1fr 1fr auto;gap:6px;align-items:end;border:1px solid var(--line);border-radius:8px;padding:8px;margin-top:6px;">
+            <div class="field" style="margin:0"><label style="font-size:10px">${T('cf_ref')}</label><input value="${escAttr(ch.ref||'')}" oninput="bindChild(${js(it.id)},'${ch.cid}','ref',this)" placeholder="e.g. 003a"></div>
+            <div class="field" style="margin:0"><label style="font-size:10px">${T('cf_disc')}</label><input value="${escAttr(ch.disc||'')}" oninput="bindChild(${js(it.id)},'${ch.cid}','disc',this)" placeholder="${T('cf_disc')}"></div>
+            <button class="del" onclick="delChild(${js(it.id)},'${ch.cid}')" style="align-self:center">✕</button>
+            <div class="field" style="margin:0"><label style="font-size:10px">${T('cf_status')}</label><select onchange="bindChild(${js(it.id)},'${ch.cid}','status',this)">${childStatusOpts(ch)}</select></div>
+            <div class="field" style="margin:0"><label style="font-size:10px">${T('cf_src')}</label><input value="${escAttr(ch.sourceref||'')}" oninput="bindChild(${js(it.id)},'${ch.cid}','sourceref',this)" placeholder="origin item · list date"></div>
+            <span></span>
+            <div class="field full" style="margin:0;grid-column:1/-1"><label style="font-size:10px">${T('cf_closeout')}</label><input value="${escAttr(ch.closeout||'')}" oninput="bindChild(${js(it.id)},'${ch.cid}','closeout',this)" placeholder="close-out note (optional)"></div>
+          </div>`).join('')+`</div>`:''}
+      </div>`;
   // survey-only: asset/equipment (identity) shown above location
   const assetField = isSurvey()
     ? `<div class="field"><label>${T('asset')}</label><input value="${escAttr(it.asset||'')}" oninput="bind(${js(it.id)},'asset',this)" placeholder="e.g. AHU-2 · Chiller 450kW · Calorifier"></div>`
@@ -1397,11 +1457,13 @@ function itemCard(it){
       </div>
       <div class="grid2">
         <div class="field"><label>${isSurvey()?T('system'):T('trade')}</label><select onchange="bind(${js(it.id)},'trade',this)">${tradeOpts}</select></div>
-        <div class="field"><label>${isSurvey()?T('timeframe'):T('priority')}</label><select onchange="bind(${js(it.id)},'priority',this)">${prioOpts}</select></div>
+        <div class="field"><label>${isSurvey()?T('timeframe'):T('severity')}</label><select onchange="bind(${js(it.id)},'priority',this)">${prioOpts}</select></div>
       </div>
+      ${detailFields}
       <div class="field"><label>${ratingLabel}</label>
         <div class="status-row">${ratingChipsHtml}</div>${histHtml}
       </div>
+      ${childrenHtml}
       ${surveyFields}
       <div class="field"><div class="notes-head"><label>${isSurvey()?T('observations'):T('notes')}</label>
         <div style="display:flex;gap:6px;">
@@ -1434,8 +1496,8 @@ function render(){
     shown.slice().sort((a,b)=>a.snag-b.snag).forEach(it=>c.appendChild(itemCard(it)));
     fillPlanThumbs(); return;
   }
-  const open=shown.filter(i=>i.status!=='complete').sort((a,b)=>a.snag-b.snag);
-  const closed=shown.filter(i=>i.status==='complete').sort((a,b)=>a.snag-b.snag);
+  const open=shown.filter(i=>i.status!=='closed').sort((a,b)=>a.snag-b.snag);
+  const closed=shown.filter(i=>i.status==='closed').sort((a,b)=>a.snag-b.snag);
   open.forEach(it=>c.appendChild(itemCard(it)));
   if(closed.length){ const d=document.createElement('div'); d.className='divider'; d.textContent=T('closed')+' ('+closed.length+')'; c.appendChild(d);
     closed.forEach(it=>c.appendChild(itemCard(it))); }
@@ -1458,7 +1520,7 @@ function escHtml(s){return (s||'').replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;',
 function escAttr(s){return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;');}
 
 /* ================= form helpers ================= */
-function meta(){return{firm:val('f_firm'),details:val('f_details'),name:val('p_name'),no:val('p_no'),client:val('p_client'),addr:val('p_addr'),inspector:val('p_inspector'),date:val('p_date'),weather:val('p_weather')};}
+function meta(){return{firm:val('f_firm'),details:val('f_details'),name:val('p_name'),no:val('p_no'),client:val('p_client'),addr:val('p_addr'),inspector:val('p_inspector'),date:val('p_date'),weather:val('p_weather'),contractor:val('p_contractor')};}
 function val(id){const e=document.getElementById(id);return e?e.value:'';}
 function setVal(id,v){const e=document.getElementById(id); if(e) e.value=v||'';}
 function flash(msg){const h=document.getElementById('hint'); h.dataset.flashing='1'; h.textContent=msg; clearTimeout(h._t); h._t=setTimeout(()=>{ h.dataset.flashing=''; h.textContent=T('autosave'); },2600);}
@@ -1486,7 +1548,7 @@ function exportCSV(){ saveCurrentToStore(); const m=meta();
   const rows=[...items].filter(inRep).sort((a,b)=>a.snag-b.snag).map(it=> isSurvey()
     ? [String(it.snag).padStart(3,'0'),cgrade(it.condition),it.trade||'',it.asset||'',it.loc||'',it.notes||'',it.recommendation||'',it.priority||'',it.life||'',
        it.gps?it.gps.lat.toFixed(6):'',it.gps?it.gps.lng.toFixed(6):'',it.ts||'']
-    : [String(it.snag).padStart(3,'0'),it.status||'',it.trade||'',it.priority||'',it.loc||'',it.notes||'',
+    : [String(it.snag).padStart(3,'0'),it.status?statusLabel(it.status):'',it.trade||'',it.priority||'',it.loc||'',it.notes||'',
        it.gps?it.gps.lat.toFixed(6):'',it.gps?it.gps.lng.toFixed(6):'',it.ts||'']);
   const lines=[head].concat(rows).map(r=>r.map(csvCell).join(',')).join('\r\n');
   const blob=new Blob(['\ufeff'+lines],{type:'text/csv;charset=utf-8'}); const a=document.createElement('a');
@@ -1551,8 +1613,7 @@ async function exportDOC(){
   const m=meta(); const survey=isSurvey(); const L=I18N[lang];
   const esc=s=>(s==null?'':String(s)).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
   const nl2br=s=>esc(s).replace(/\n/g,'<br>');
-  const sl={complete:T('complete'),incomplete:T('incomplete'),defect:T('defect')};
-  const rlabel=it=> survey ? (it.condition?T('cond_'+it.condition):'—') : (sl[it.status]||'—');
+  const rlabel=it=> survey ? (it.condition?T('cond_'+it.condition):'—') : statusLabel(it.status);
   const num=it=>`${T(survey?'item_no':'snag_no')} ${String(it.snag).padStart(3,'0')}`;
   let b='';
   // letterhead
@@ -1582,7 +1643,7 @@ async function exportDOC(){
       action.forEach(it=>b+=`<tr><td style="${TD}">${String(it.snag).padStart(3,'0')}</td><td style="${TD}">${esc(rlabel(it))}</td><td style="${TD}">${esc(it.trade)}</td><td style="${TD}">${esc(it.loc)}</td></tr>`);
       b+=`</table>`; }
   } else {
-    const flagged=items.filter(i=>(i.status==='defect'||i.status==='incomplete')&&inRep(i)).sort((a,b)=>a.snag-b.snag);
+    const flagged=items.filter(i=>isOutstanding(i)&&inRep(i)).sort((a,b)=>a.snag-b.snag);
     if(flagged.length){ b+=`<h2 style="font-size:13pt">${esc(T('pdf_summary'))}</h2>`;
       b+=`<table style="border-collapse:collapse;width:100%"><tr><th style="${TH}">Snag</th><th style="${TH}">Status</th><th style="${TH}">${esc(T('trade'))}</th><th style="${TH}">${esc(T('loc'))}</th><th style="${TH}">Pri.</th></tr>`;
       flagged.forEach(it=>b+=`<tr><td style="${TD}">${String(it.snag).padStart(3,'0')}</td><td style="${TD}">${esc(rlabel(it))}</td><td style="${TD}">${esc(it.trade)}</td><td style="${TD}">${esc(it.loc)}</td><td style="${TD}">${esc(it.priority)}</td></tr>`);
@@ -1600,15 +1661,26 @@ async function exportDOC(){
     const metaR=[(rl&&rl!=='—')?rl:'', tag?'['+tag+']':''].filter(Boolean).join(' ');
     b+=`<div style="font-weight:bold;font-size:12pt">${esc(num(it))}${metaR?' — '+esc(metaR):''}</div>`;
     // notes/observations prominent first
-    b+=`<div style="margin-top:5px"><b>${esc(T(survey?'pdf_obs':'pdf_notes'))}</b><div style="font-size:11.5pt;margin-top:1px">${nl2br(it.notes||'—')}</div></div>`;
-    if(survey){ b+=`<div style="margin-top:5px"><b>${esc(T('pdf_rec'))}</b><div style="font-size:11.5pt;margin-top:1px">${nl2br(it.recommendation||'—')}</div></div>`; }
+    b+=`<div style="margin-top:5px"><b>${esc(T(survey?'pdf_obs':'pdf_notes'))}</b><div style="font-size:11.5pt;margin-top:1px">${nl2br(normText(it.notes)||'—')}</div></div>`;
+    if(survey){ b+=`<div style="margin-top:5px"><b>${esc(T('pdf_rec'))}</b><div style="font-size:11.5pt;margin-top:1px">${nl2br(normText(it.recommendation)||'—')}</div></div>`; }
     // compact meta line (room, location…) — logged moves to the end of the snag
     const meta1=[]; if(survey&&it.asset) meta1.push('<b>'+esc(T('pdf_asset'))+'</b> '+esc(it.asset));
     if(it.room) meta1.push('<b>'+esc(T('room'))+':</b> '+esc(it.room));
     meta1.push('<b>'+esc(T('pdf_loc'))+'</b> '+esc(it.loc||'—'));
+    if(!survey&&it.system) meta1.push('<b>'+esc(T('system'))+':</b> '+esc(normText(it.system)));
+    if(it.specref) meta1.push('<b>'+esc(T('pdf_specref'))+'</b> '+esc(normText(it.specref)));
+    if(it.sourceref) meta1.push('<b>'+esc(T('pdf_source'))+'</b> '+esc(normText(it.sourceref)));
+    if(it.closedate) meta1.push('<b>'+esc(T('pdf_close'))+'</b> '+esc(it.closedate));
     if(survey&&it.life) meta1.push('<b>'+esc(T('pdf_life'))+'</b> '+esc(it.life));
     if(it.gps) meta1.push('GPS: '+it.gps.lat.toFixed(5)+', '+it.gps.lng.toFixed(5));
     b+=`<div style="margin-top:4px;font-size:9pt;color:#555">${meta1.join(' &nbsp;&nbsp; ')}</div>`;
+    // carried-forward sub-items — single source (it.children): table + count derive from the same array
+    if(!survey && Array.isArray(it.children) && it.children.length){
+      b+=`<div style="margin-top:6px;font-size:10pt"><b>${esc(T('pdf_cf'))} (${it.children.length})</b></div>`;
+      b+=`<table style="border-collapse:collapse;width:100%;margin-top:2px"><tr><th style="${TH}">${esc(T('cf_ref'))}</th><th style="${TH}">${esc(T('cf_disc'))}</th><th style="${TH}">${esc(T('cf_status'))}</th><th style="${TH}">${esc(T('cf_src'))}</th><th style="${TH}">${esc(T('cf_closeout'))}</th></tr>`;
+      it.children.forEach(ch=>{ b+=`<tr><td style="${TD}">${esc(ch.ref||'—')}</td><td style="${TD}">${esc(ch.disc||'—')}</td><td style="${TD}">${esc(statusLabel(ch.status))}</td><td style="${TD}">${esc(normText(ch.sourceref)||'—')}</td><td style="${TD}">${esc(normText(ch.closeout)||'—')}</td></tr>`; });
+      b+=`</table>`;
+    }
     if(rptOn('history') && it.history&&it.history.length){ b+=`<div style="margin-top:4px;font-size:9pt;color:#555"><i>${lang==='af'?'Statusgeskiedenis':'Status history'}:</i><br>`+it.history.map(h=>`• ${esc(h.ts)}: ${esc(h.from)} &rarr; ${esc(h.to)}`).join('<br>')+`</div>`; }
     if(rptOn('plans') && it.planRef){ const crop=await planCropImage(it);
       if(crop) b+=`<div style="margin-top:4px"><b>Plan: ${esc(planNameById(it.planRef.planId))}</b><br><img src="${crop}" style="width:48%;border:1px solid #ccc"></div>`; }
@@ -1627,7 +1699,12 @@ async function exportDOC(){
     const syms=pl.symbols||[]; if(syms.length){ const byDisc={}; syms.forEach(s=>{ (byDisc[s.disc]=byDisc[s.disc]||new Set()).add(s.k); });
       Object.keys(byDisc).forEach(d=>{ b+=`<div style="font-size:9pt;color:#555">${esc(MEP_SYMBOLS[d].name)} &mdash; `+[...byDisc[d]].map(k=>esc(k+' = '+symLabel(d,k))).join('; ')+`</div>`; }); }
   }
-  if(m.inspector){ b+=`<div style="margin-top:28px"><b>${esc(T('pdf_signoff'))}</b><br><br>__________________________<br>${esc(m.inspector)}${m.date?' — '+esc(m.date):''}</div>`; }
+  if(m.inspector){ b+=`<div style="margin-top:28px"><b>${esc(T('pdf_signoff'))}</b></div>`;
+    b+=`<table style="width:100%;margin-top:10px"><tr><td style="width:50%;vertical-align:top">__________________________<br>${esc(lang==='af'?'Inspekteur (handtekening)':'Inspector (signature)')}<br>${esc(m.inspector)}${m.date?' — '+esc(m.date):''}</td>`;
+    b+= m.contractor
+      ? `<td style="width:50%;vertical-align:top"><b>${esc(T('pdf_contractor'))}</b><br>${esc(lang==='af'?'Naam':'Name')}: ${esc(m.contractor)}<br>${esc(lang==='af'?'Handtekening':'Signature')}: __________<br>${esc(lang==='af'?'Datum':'Date')}: __________</td>`
+      : `<td></td>`;
+    b+=`</tr></table>`; }
   const head=`<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>${esc(m.name||'Inspection')}</title><style>@page{size:21cm 29.7cm;margin:2cm} body{font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#111}</style></head><body>`;
   const html=head+b+`</body></html>`;
   const blob=new Blob(['﻿'+html],{type:'application/msword'});
@@ -1646,9 +1723,19 @@ function spellIssues(){ const issues=[]; const survey=isSurvey();
     const seen=new Set(); s.toLowerCase().replace(/[^a-z']+/g,' ').split(/\s+/).forEach(w=>{ if(w&&COMMON_TYPOS[w]&&COMMON_TYPOS[w]!==''&&!seen.has(w)){ seen.add(w); issues.push({where,msg:(lang==='af'?'moontlike tikfout':'possible typo')+' “'+w+'” → “'+COMMON_TYPOS[w]+'”'}); } }); };
   const m=meta();
   ck(T('pname'),m.name); ck(T('client'),m.client); ck(T('addr'),m.addr); ck(T('firmdet'),m.details);
-  items.forEach(it=>{ const n=(survey?T('item_no'):T('snag_no'))+' '+String(it.snag).padStart(3,'0');
+  items.forEach(it=>{ if(!inRep(it)) return; const n=(survey?T('item_no'):T('snag_no'))+' '+String(it.snag).padStart(3,'0');
     ck(n+' · '+(survey?T('observations'):T('notes')), it.notes); ck(n+' · '+T('recommendation'), it.recommendation);
-    ck(n+' · '+T('loc'), it.loc); ck(n+' · '+T('room'), it.room); if(survey) ck(n+' · '+T('asset'), it.asset); });
+    ck(n+' · '+T('loc'), it.loc); ck(n+' · '+T('room'), it.room); if(survey) ck(n+' · '+T('asset'), it.asset);
+    if(!survey){
+      // severity is mandatory and must be one of the enum values
+      if(!it.priority) issues.push({where:n,msg:(lang==='af'?'felheid ontbreek (Krities/Belangrik/Gering)':'severity missing (Critical/Major/Minor)')});
+      // discipline must be present so the tag is uniformly "Discipline · Severity"
+      if(!it.trade) issues.push({where:n,msg:(lang==='af'?'dissipline ontbreek (vir “Dissipline · Felheid” etiket)':'discipline missing (for “Discipline · Severity” tag)')});
+    }
+    // Room "All" together with a specific Location is contradictory
+    if(/^\s*(all|alles|alle)\s*$/i.test(it.room||'') && it.loc && it.loc.trim())
+      issues.push({where:n,msg:(lang==='af'?'Kamer “Alle” weerspreek spesifieke Ligging':'Room “All” contradicts a specific Location')});
+  });
   return issues; }
 function checkThenPDF(){ saveCurrentToStore(); const issues=spellIssues(); const list=document.getElementById('spellList');
   if(!issues.length){ exportPDF(); return; }
@@ -1686,8 +1773,8 @@ async function exportPDF(){
   rows.forEach(r=>{ if(curHidden.has(r[0])) return; doc.setFont('helvetica','bold'); doc.setTextColor(40); doc.text(r[1],M,y);
     doc.setFont('helvetica','normal'); doc.setTextColor(20); doc.text(doc.splitTextToSize(r[2]||'—',W-M-58),M+48,y); y+=6; });
   y+=1; line(y); y+=8;
-  const sl={complete:T('complete').toUpperCase(),incomplete:T('incomplete').toUpperCase(),defect:T('defect').toUpperCase(),'':'—'};
-  const rlabel=(it)=> isSurvey() ? (it.condition? T('cond_'+it.condition).toUpperCase() : '—') : (sl[it.status]||'—');
+  const slabel=s=> s?T('st_'+s).toUpperCase():'—';
+  const rlabel=(it)=> isSurvey() ? (it.condition? T('cond_'+it.condition).toUpperCase() : '—') : slabel(it.status);
   let secNo=1;
   if(rptOn('summary')){
   if(isSurvey()){
@@ -1708,7 +1795,7 @@ async function exportPDF(){
     }
     y+=3; line(y,true); y+=8;
   } else {
-    const flagged=items.filter(i=>(i.status==='defect'||i.status==='incomplete')&&inRep(i)).sort((a,b)=>a.snag-b.snag);
+    const flagged=items.filter(i=>isOutstanding(i)&&inRep(i)).sort((a,b)=>a.snag-b.snag);
     if(flagged.length){ secNo=2;
       doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20); doc.text('1.0  '+T('pdf_summary'),M,y); y+=6;
       const cols=[['Snag',16],['Status',26],[T('trade'),30],[T('loc'),62],['Pri.',20]];
@@ -1716,7 +1803,7 @@ async function exportPDF(){
       let cx=M+1.5; cols.forEach(c=>{ doc.text(String(c[0]),cx,y); cx+=c[1]; }); y+=6;
       doc.setFont('helvetica','normal'); doc.setTextColor(25);
       flagged.forEach((it,i)=>{ ck(7); if(i%2){ doc.setFillColor(244,245,247); doc.rect(M,y-4.2,W-2*M,6,'F'); } cx=M+1.5;
-        [String(it.snag).padStart(3,'0'),sl[it.status],it.trade||'—',it.loc||'—',it.priority||'—'].forEach((t,j)=>{ doc.text(doc.splitTextToSize(t,cols[j][1]-2),cx,y); cx+=cols[j][1]; }); y+=6; });
+        [String(it.snag).padStart(3,'0'),slabel(it.status),it.trade||'—',it.loc||'—',it.priority||'—'].forEach((t,j)=>{ doc.text(doc.splitTextToSize(t,cols[j][1]-2),cx,y); cx+=cols[j][1]; }); y+=6; });
       y+=3; line(y,true); y+=8;
     }
   }
@@ -1736,9 +1823,11 @@ async function exportPDF(){
     // measure so each compact snag stays whole (≈2 fit per page)
     let est=8+6+6;
     if(isSurvey()&&it.asset) est+=6; if(it.gps) est+=6; if(it.audio) est+=6;
-    est+=5+5*doc.splitTextToSize(it.notes||'—',W-2*M).length;
-    if(isSurvey()) est+=1+5+5*doc.splitTextToSize(it.recommendation||'—',W-2*M).length+(it.life?6:0);
+    est+=5+5*doc.splitTextToSize(normText(it.notes)||'—',W-2*M).length;
+    if(isSurvey()) est+=1+5+5*doc.splitTextToSize(normText(it.recommendation)||'—',W-2*M).length+(it.life?6:0);
     if(rptOn('history') && it.history&&it.history.length) est+=5+4*it.history.length;
+    const kids=(!isSurvey()&&Array.isArray(it.children))?it.children:[];
+    if(kids.length) est+=6+5*(kids.length+1);
     if(cells.length){ est+=4; for(let i=0;i<cells.length;i+=2) est+=Math.max(cells[i].h, cells[i+1]?cells[i+1].h:0)+5; }
     est+=10;
     if(y+est>H-20 && y>M+2){ doc.addPage(); y=M; }
@@ -1749,10 +1838,10 @@ async function exportPDF(){
     // NOTES / OBSERVATIONS — the key content, shown prominently right under the header
     doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor(20); doc.text(T(isSurvey()?'pdf_obs':'pdf_notes'),M,y); y+=5.5;
     doc.setFont('helvetica','normal'); doc.setFontSize(10.5); doc.setTextColor(20);
-    doc.splitTextToSize(it.notes||'—',W-2*M).forEach(t=>{ ck(7); doc.text(t,M,y); y+=5.5; });
+    doc.splitTextToSize(normText(it.notes)||'—',W-2*M).forEach(t=>{ ck(7); doc.text(t,M,y); y+=5.5; });
     if(isSurvey()){
       y+=1.5; doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor(20); doc.text(T('pdf_rec'),M,y); y+=5.5;
-      doc.setFont('helvetica','normal'); doc.setFontSize(10.5); doc.splitTextToSize(it.recommendation||'—',W-2*M).forEach(t=>{ ck(7); doc.text(t,M,y); y+=5.5; });
+      doc.setFont('helvetica','normal'); doc.setFontSize(10.5); doc.splitTextToSize(normText(it.recommendation)||'—',W-2*M).forEach(t=>{ ck(7); doc.text(t,M,y); y+=5.5; });
     }
     // meta — compact, muted line (room, location, etc.)  — logged moves to the end of the snag
     y+=1.5; doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(110);
@@ -1760,11 +1849,27 @@ async function exportPDF(){
     if(isSurvey()&&it.asset) meta1.push(T('pdf_asset')+' '+it.asset);
     if(it.room) meta1.push(T('room')+': '+it.room);
     meta1.push(T('pdf_loc')+' '+(it.loc||'—'));
+    if(!isSurvey()&&it.system) meta1.push(T('system')+': '+normText(it.system));
+    if(it.specref) meta1.push(T('pdf_specref')+' '+normText(it.specref));
+    if(it.sourceref) meta1.push(T('pdf_source')+' '+normText(it.sourceref));
+    if(it.closedate) meta1.push(T('pdf_close')+' '+it.closedate);
     if(isSurvey()&&it.life) meta1.push(T('pdf_life')+' '+it.life);
     if(it.gps) meta1.push('GPS: '+it.gps.lat.toFixed(5)+', '+it.gps.lng.toFixed(5));
     if(it.audio) meta1.push(lang==='af'?'(stemmemo)':'(voice memo)');
     doc.splitTextToSize(meta1.join('      '),W-2*M).forEach(t=>{ ck(5); doc.text(t,M,y); y+=4.2; });
     doc.setTextColor(20);
+    // carried-forward sub-items table — single source (it.children); count derives from same array
+    if(kids.length){ y+=2.5; ck(6); doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(40);
+      doc.text(T('pdf_cf')+' ('+kids.length+')',M,y); y+=4.5;
+      const ccols=[[T('cf_ref'),22],[T('cf_disc'),34],[T('cf_status'),26],[T('cf_src'),48],[T('cf_closeout'),W-2*M-130]];
+      doc.setFillColor(60,66,78); doc.rect(M,y-4,W-2*M,5.5,'F'); doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(255);
+      let hx=M+1.5; ccols.forEach(c=>{ doc.text(String(c[0]),hx,y); hx+=c[1]; }); y+=5;
+      doc.setFont('helvetica','normal'); doc.setTextColor(30);
+      kids.forEach((ch,ci)=>{ ck(6); if(ci%2){ doc.setFillColor(244,245,247); doc.rect(M,y-4,W-2*M,5.5,'F'); }
+        let cx2=M+1.5; const rowVals=[ch.ref||'—',normText(ch.disc)||'—',ch.status?T('st_'+ch.status):'—',normText(ch.sourceref)||'—',normText(ch.closeout)||'—'];
+        let maxLines=1; rowVals.forEach((t,j)=>{ const lines=doc.splitTextToSize(String(t),ccols[j][1]-2); maxLines=Math.max(maxLines,lines.length); doc.text(lines,cx2,y); cx2+=ccols[j][1]; });
+        y+=Math.max(5,maxLines*3.6); });
+      doc.setTextColor(20); y+=1; }
     if(rptOn('history') && it.history&&it.history.length){ y+=1; doc.setFont('helvetica','italic'); doc.setFontSize(8.5); doc.setTextColor(110); doc.text('Status history:',M,y); y+=4;
       it.history.forEach(h=>{ ck(5); doc.text(`- ${h.ts}: ${h.from} -> ${h.to}`,M+3,y); y+=4; }); doc.setTextColor(20); }
     if(cells.length){ y+=2;
@@ -1830,19 +1935,35 @@ async function exportPDF(){
     // sign-off fits on the (last) reference-plan page
     if(isLastPlan && m.inspector){ y+=5; line(y,true); y+=8;
       doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20); doc.text(T('pdf_signoff'),M,y); y+=10;
-      doc.setDrawColor(120); doc.setLineWidth(0.3); doc.line(M,y,M+70,y); doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(60);
-      doc.text(lang==='af'?'Inspekteur (handtekening)':'Inspector (signature)',M,y+5); doc.text(`${lang==='af'?'Naam':'Name'}:  ${m.inspector}`,M,y+12); doc.text(`${lang==='af'?'Datum':'Date'}:  ${m.date||''}`,M,y+18);
+      drawSignoff(doc,y,M,W,m,lang);
       signedOff=true; }
   }
 
   if(m.inspector && !signedOff){ y+=4; if(y+40>H-20){ doc.addPage(); y=M; } else { line(y,true); y+=8; }
     doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20); doc.text(T('pdf_signoff'),M,y); y+=10;
-    doc.setDrawColor(120); doc.setLineWidth(0.3); doc.line(M,y,M+70,y); doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(60);
-    doc.text(lang==='af'?'Inspekteur (handtekening)':'Inspector (signature)',M,y+5); doc.text(`${lang==='af'?'Naam':'Name'}:  ${m.inspector}`,M,y+12); doc.text(`${lang==='af'?'Datum':'Date'}:  ${m.date||''}`,M,y+18); }
+    drawSignoff(doc,y,M,W,m,lang); }
   const pages=doc.getNumberOfPages();
   for(let p=1;p<=pages;p++){ doc.setPage(p); doc.setFontSize(8); doc.setTextColor(120);
     doc.text(`${m.no?m.no+' — ':''}${m.name||'Inspection'}`,M,H-8); doc.text(`${lang==='af'?'Bladsy':'Page'} ${p}/${pages}`,W-M,H-8,{align:'right'}); }
   doc.save(`Snag-${(m.no||'inspection').replace(/[^\w-]/g,'')}-${m.date||''}.pdf`);
+}
+function drawSignoff(doc,y,M,W,m,lang){
+  // two side-by-side blocks: inspector (left) + contractor acknowledgement (right, if a contractor is named)
+  const colW=70, leftX=M, rightX=(W-M-colW);
+  doc.setDrawColor(120); doc.setLineWidth(0.3); doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(60);
+  doc.line(leftX,y,leftX+colW,y);
+  doc.text(lang==='af'?'Inspekteur (handtekening)':'Inspector (signature)',leftX,y+5);
+  doc.text(`${lang==='af'?'Naam':'Name'}:  ${m.inspector}`,leftX,y+12);
+  doc.text(`${lang==='af'?'Datum':'Date'}:  ${m.date||''}`,leftX,y+18);
+  if(m.contractor){
+    doc.line(rightX,y,rightX+colW,y);
+    doc.setFont('helvetica','bold'); doc.setTextColor(60); doc.text(T('pdf_contractor'),rightX,y+5);
+    doc.setFont('helvetica','normal');
+    doc.text(`${lang==='af'?'Naam':'Name'}:  ${m.contractor}`,rightX,y+12);
+    doc.text(`${lang==='af'?'Handtekening':'Signature'}: __________`,rightX,y+18);
+    doc.text(`${lang==='af'?'Datum':'Date'}: __________`,rightX,y+24);
+  }
+  doc.setTextColor(20);
 }
 function imgDim(src){return new Promise(res=>{const i=new Image();i.onload=()=>res({w:i.width,h:i.height});i.onerror=()=>res({w:4,h:3});i.src=src;});}
 
