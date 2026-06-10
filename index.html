@@ -284,6 +284,7 @@
     <div class="grid2">
       <div class="field"><label id="t_pname">Project Name</label><input id="p_name" oninput="touch();syncSel()" placeholder="e.g. Substation Building B"></div>
       <div class="field"><label id="t_pno">Project No.</label><input id="p_no" oninput="touch();syncSel()" placeholder="e.g. M5438"></div>
+      <div class="field"><label id="t_listno">Snag List No.</label><input id="p_listno" oninput="touch()" placeholder="e.g. SL-03 / Rev B"></div>
       <div class="field"><label id="t_client">Client</label><input id="p_client" oninput="touch()" placeholder="Client / organisation"></div>
       <div class="field"><label id="t_addr">Site Address</label><input id="p_addr" oninput="touch()" placeholder="Physical site address"></div>
       <div class="field"><label id="t_insp">Inspector</label><input id="p_inspector" oninput="touch()" placeholder="Name &amp; designation"></div>
@@ -434,7 +435,7 @@ const I18N={
   en:{title:'Inspection Snag List',sub:'Field capture · on-site record · PDF export',langBtn:'AFR',
     firm_h:'Firm / Letterhead',logo:'Logo (optional)',uplogo:'Upload Logo',rmlogo:'Remove',
     firmname:'Firm Name',firmdet:'Firm Details (address / tel / email)',proj_h:'Project Details',
-    pname:'Project Name',pno:'Project No.',client:'Client',addr:'Site Address',insp:'Inspector',
+    pname:'Project Name',pno:'Project No.',listno:'Snag List No.',client:'Client',addr:'Site Address',insp:'Inspector',
     date:'Inspection Date',weather:'Weather / Site Conditions',additem:'＋ Add Inspection Item',
     backup:'Backup',restore:'Restore',csv:'CSV',pdf:'PDF',new:'New',dup:'Duplicate',delinsp:'Delete',
     closed:'Closed Items',complete:'Complete',incomplete:'Incomplete',defect:'Defect',
@@ -474,7 +475,7 @@ const I18N={
   af:{title:'Inspeksie Foutlys',sub:'Veldopname · terreinrekord · PDF-uitvoer',langBtn:'ENG',
     firm_h:'Firma / Briefhoof',logo:'Logo (opsioneel)',uplogo:'Laai Logo',rmlogo:'Verwyder',
     firmname:'Firmanaam',firmdet:'Firmabesonderhede (adres / tel / e-pos)',proj_h:'Projekbesonderhede',
-    pname:'Projeknaam',pno:'Projek Nr.',client:'Kliënt',addr:'Terreinadres',insp:'Inspekteur',
+    pname:'Projeknaam',pno:'Projek Nr.',listno:'Foutlys Nr.',client:'Kliënt',addr:'Terreinadres',insp:'Inspekteur',
     date:'Inspeksiedatum',weather:'Weer / Terreintoestande',additem:'＋ Voeg Inspeksie-item By',
     backup:'Rugsteun',restore:'Herstel',csv:'CSV',pdf:'PDF',new:'Nuut',dup:'Dupliseer',delinsp:'Skrap',
     closed:'Voltooide Items',complete:'Voltooi',incomplete:'Onvoltooi',defect:'Gebrek',
@@ -522,7 +523,7 @@ function applyLang(){
   set('t_mode','mode');set('t_mode_snag','mode_snag');set('t_mode_survey','mode_survey');
   set('t_firm_h','firm_h');set('t_logo','logo');set('t_uplogo','uplogo');set('t_rmlogo','rmlogo');
   set('t_firmname','firmname');set('t_firmdet','firmdet');set('t_proj_h','proj_h');
-  set('t_pname','pname');set('t_pno','pno');set('t_client','client');set('t_addr','addr');
+  set('t_pname','pname');set('t_pno','pno');set('t_listno','listno');set('t_client','client');set('t_addr','addr');
   set('t_insp','insp');set('t_date','date');set('t_weather','weather');set('t_contractor','contractor');
   { const ai=document.getElementById('t_additem'); if(ai) ai.textContent=T(isSurvey()?'additem_survey':'additem'); }
   set('t_rs_h','rs_h');set('t_rs_hint','rs_hint');
@@ -692,7 +693,7 @@ function applySnapshotToForm(d){
   curMode = (d.mode==='survey') ? 'survey' : 'snag';
   curReportOpts = Object.assign({summary:true,plans:true,photos:true,history:true,group:false}, d.reportOpts||{});
   curHidden = new Set(d.hidden||[]);
-  setVal('f_firm',m.firm);setVal('f_details',m.details);setVal('p_name',m.name);setVal('p_no',m.no);
+  setVal('f_firm',m.firm);setVal('f_details',m.details);setVal('p_name',m.name);setVal('p_no',m.no);setVal('p_listno',m.listno);
   setVal('p_client',m.client);setVal('p_addr',m.addr);setVal('p_inspector',m.inspector);
   setVal('p_date',m.date||new Date().toISOString().slice(0,10));setVal('p_weather',m.weather);setVal('p_contractor',m.contractor);
   items=(d.items||[]).map(it=>{ const o=Object.assign({trade:'',priority:'',gps:null,history:[],snag:0,audio:null,room:'',planRef:null,condition:'',recommendation:'',asset:'',life:'',excluded:false,system:'',specref:'',closedate:'',sourceref:'',children:[]},it);
@@ -1384,7 +1385,7 @@ function toggleReportOpt(k){ curReportOpts[k]=!rptOn(k); touch(); renderReportOp
   flash(rptOn(k)?(T('rs_'+k)+': '+(lang==='af'?'ingesluit':'included')):(T('rs_'+k)+': '+(lang==='af'?'uitgesluit':'excluded'))); }
 
 /* ===== per-field ✕ : remove a project-detail row from the report ===== */
-const META_FIELDS=[['name','t_pname'],['no','t_pno'],['client','t_client'],['addr','t_addr'],['inspector','t_insp'],['date','t_date'],['weather','t_weather']];
+const META_FIELDS=[['name','t_pname'],['no','t_pno'],['listno','t_listno'],['client','t_client'],['addr','t_addr'],['inspector','t_insp'],['date','t_date'],['weather','t_weather']];
 function renderFieldHides(){ META_FIELDS.forEach(([key,lid])=>{ const lbl=document.getElementById(lid); if(!lbl) return; const field=lbl.parentElement; if(!field) return;
   let btn=field.querySelector('.fldhide'); if(!btn){ btn=document.createElement('button'); btn.type='button'; btn.className='fldhide'; btn.onclick=(e)=>{ e.preventDefault(); toggleHideField(key); }; field.appendChild(btn); }
   const hid=curHidden.has(key); btn.textContent=hid?('＋ '+T('rs_addrep')):('✕ '+T('rs_rmrep')); field.classList.toggle('fld-hidden',hid); }); }
@@ -1522,7 +1523,7 @@ function escHtml(s){return (s||'').replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;',
 function escAttr(s){return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;');}
 
 /* ================= form helpers ================= */
-function meta(){return{firm:val('f_firm'),details:val('f_details'),name:val('p_name'),no:val('p_no'),client:val('p_client'),addr:val('p_addr'),inspector:val('p_inspector'),date:val('p_date'),weather:val('p_weather'),contractor:val('p_contractor')};}
+function meta(){return{firm:val('f_firm'),details:val('f_details'),name:val('p_name'),no:val('p_no'),listno:val('p_listno'),client:val('p_client'),addr:val('p_addr'),inspector:val('p_inspector'),date:val('p_date'),weather:val('p_weather'),contractor:val('p_contractor')};}
 function val(id){const e=document.getElementById(id);return e?e.value:'';}
 function setVal(id,v){const e=document.getElementById(id); if(e) e.value=v||'';}
 function flash(msg){const h=document.getElementById('hint'); h.dataset.flashing='1'; h.textContent=msg; clearTimeout(h._t); h._t=setTimeout(()=>{ h.dataset.flashing=''; h.textContent=T('autosave'); },2600);}
@@ -1626,7 +1627,7 @@ async function exportDOC(){
   b+=`</td></tr></table><hr>`;
   b+=`<div style="font-size:16pt;font-weight:bold;margin-bottom:8px">${esc(T(survey?'pdf_title_survey':'pdf_title'))}</div>`;
   // project details (hidden fields omitted)
-  const drows=[['name',L.pname,m.name],['no',L.pno,m.no],['client',L.client,m.client],['addr',L.addr,m.addr],['inspector',L.insp,m.inspector],['date',L.date,m.date],['weather',L.weather,m.weather]];
+  const drows=[['name',L.pname,m.name],['no',L.pno,m.no],['listno',L.listno,m.listno],['client',L.client,m.client],['addr',L.addr,m.addr],['inspector',L.insp,m.inspector],['date',L.date,m.date],['weather',L.weather,m.weather]];
   b+=`<table style="border-collapse:collapse">`;
   drows.forEach(r=>{ if(curHidden.has(r[0])) return; b+=`<tr><td style="font-weight:bold;padding:2px 14px 2px 0">${esc(r[1])}</td><td style="padding:2px 0">${esc(r[2]||'—')}</td></tr>`; });
   b+=`</table>`;
@@ -1770,7 +1771,7 @@ async function exportPDF(){
   y=Math.max(headBottom,dy,y+12)+3; line(y); y+=7;
   doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(20); doc.text(T(isSurvey()?'pdf_title_survey':'pdf_title'),M,y); y+=8;
   const L=I18N[lang];
-  const rows=[['name',L.pname,m.name],['no',L.pno,m.no],['client',L.client,m.client],['addr',L.addr,m.addr],['inspector',L.insp,m.inspector],['date',L.date,m.date],['weather',L.weather,m.weather]];
+  const rows=[['name',L.pname,m.name],['no',L.pno,m.no],['listno',L.listno,m.listno],['client',L.client,m.client],['addr',L.addr,m.addr],['inspector',L.insp,m.inspector],['date',L.date,m.date],['weather',L.weather,m.weather]];
   doc.setFontSize(9.5);
   rows.forEach(r=>{ if(curHidden.has(r[0])) return; doc.setFont('helvetica','bold'); doc.setTextColor(40); doc.text(r[1],M,y);
     doc.setFont('helvetica','normal'); doc.setTextColor(20); doc.text(doc.splitTextToSize(r[2]||'—',W-M-58),M+48,y); y+=6; });
