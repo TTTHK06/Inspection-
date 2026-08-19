@@ -1074,10 +1074,21 @@ function placePin(fx,fy){ const p=plans[curPlanPage]; if(!p) return;
   if(planMode==='room'){ const name=prompt(lang==='af'?'Kamernaam:':'Room name:',''); if(name==null||!name.trim()) return;
     p.rooms.push({name:name.trim(),fx,fy}); touch(); drawPlanOverlay(); renderRoomList(); return; }
   // pin mode
-  seq++; const room=nearestRoom(p,fx,fy)||'';
-  const it={id:uid(),snag:seq,loc:room,room,status:'',trade:'',priority:'',notes:'',photos:[],audio:null,gps:null,ts:nowStamp(),history:[],children:[],planRef:{planId:p.id,fx,fy}};
-  items.push(it); touch(); drawPlanOverlay(); render();
-  flash((lang==='af'?'Fout gepen: SNAG ':'Pinned SNAG ')+String(seq).padStart(3,'0')+(room?(' ('+room+')'):'')); }
+  const room=nearestRoom(p,fx,fy)||'';
+  // reuse the lowest-numbered blank/unused snag (e.g. the auto-created SNAG 001) so the first
+  // pin becomes 001 instead of leaving an empty snag behind; otherwise create a new one.
+  const blank=items.filter(isBlankSnag).sort((a,b)=>a.snag-b.snag)[0];
+  let it;
+  if(blank){ it=blank; it.loc=room; it.room=room; it.ts=nowStamp(); it.planRef={planId:p.id,fx,fy}; }
+  else { seq++; it={id:uid(),snag:seq,loc:room,room,status:'',trade:'',priority:'',notes:'',photos:[],audio:null,gps:null,ts:nowStamp(),history:[],children:[],planRef:{planId:p.id,fx,fy}}; items.push(it); }
+  touch(); drawPlanOverlay(); render();
+  flash((lang==='af'?'Fout gepen: SNAG ':'Pinned SNAG ')+String(it.snag).padStart(3,'0')+(room?(' ('+room+')'):'')); }
+// a snag with nothing entered yet — safe to reuse when the first pin is dropped
+function isBlankSnag(it){
+  return !it.loc && !it.room && !it.notes && !(it.photos&&it.photos.length) && !it.audio && !it.gps
+    && !it.planRef && !it.trade && !it.priority && !it.status && !it.condition && !it.asset
+    && !it.recommendation && !it.specref && !it.sourceref && !(it.children&&it.children.length);
+}
 
 /* ---- unified pointer/touch handling: tap=place, drag=pan, pinch=zoom, zone-mode drag=box ---- */
 let ptrDown=false, ptrMoved=false, ptrStartX=0, ptrStartY=0, panStartTx=0, panStartTy=0;
