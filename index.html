@@ -471,7 +471,12 @@ const I18N={
     pdf_title_survey:'BUILDING CONDITION SURVEY',pdf_sub_survey:'Existing building — condition assessment record',
     pdf_summary_survey:'Condition Summary',pdf_detail_survey:'Condition Survey Detail',
     pdf_rec:'Recommendation:',pdf_cost:'Est. cost:',pdf_total:'Total estimated cost',pdf_cond:'Condition:',
-    pdf_obs:'Observations:',pdf_asset:'Asset:',pdf_life:'Rem. life:',pdf_system:'System:',pdf_refplan:'Reference Plan'},
+    pdf_obs:'Observations:',pdf_asset:'Asset:',pdf_life:'Rem. life:',pdf_system:'System:',pdf_refplan:'Reference Plan',
+    rs_f_signoff:'Completion checklist',pdf_completed:'Completed',
+    pdf_compl_h:'Contractor Completion Sign-off',
+    pdf_compl_stmt:'I confirm that the snag items marked complete above have been carried out and completed.',
+    pdf_compl_all:'All snag items completed',
+    pdf_lbl_name:'Name',pdf_lbl_company:'Company',pdf_lbl_sig:'Signature',pdf_lbl_date:'Date'},
   af:{title:'Inspeksie Foutlys',sub:'Veldopname · terreinrekord · PDF-uitvoer',langBtn:'ENG',
     firm_h:'Firma / Briefhoof',logo:'Logo (opsioneel)',uplogo:'Laai Logo',rmlogo:'Verwyder',
     firmname:'Firmanaam',firmdet:'Firmabesonderhede (adres / tel / e-pos)',proj_h:'Projekbesonderhede',
@@ -511,7 +516,12 @@ const I18N={
     pdf_title_survey:'GEBOU TOESTANDSOPNAME',pdf_sub_survey:'Bestaande gebou — toestandbeoordelingsrekord',
     pdf_summary_survey:'Toestand Opsomming',pdf_detail_survey:'Toestandsopname Besonderhede',
     pdf_rec:'Aanbeveling:',pdf_cost:'Beraamde koste:',pdf_total:'Totale beraamde koste',pdf_cond:'Toestand:',
-    pdf_obs:'Waarnemings:',pdf_asset:'Bate:',pdf_life:'Oorbl. lewe:',pdf_system:'Stelsel:',pdf_refplan:'Verwysingsplan'}
+    pdf_obs:'Waarnemings:',pdf_asset:'Bate:',pdf_life:'Oorbl. lewe:',pdf_system:'Stelsel:',pdf_refplan:'Verwysingsplan',
+    rs_f_signoff:'Voltooiing-kontrolelys',pdf_completed:'Voltooi',
+    pdf_compl_h:'Kontrakteur Voltooiing-ondertekening',
+    pdf_compl_stmt:'Ek bevestig dat die foutitems hierbo as voltooi gemerk, uitgevoer en voltooi is.',
+    pdf_compl_all:'Alle foutitems voltooi',
+    pdf_lbl_name:'Naam',pdf_lbl_company:'Maatskappy',pdf_lbl_sig:'Handtekening',pdf_lbl_date:'Datum'}
 };
 let lang = localStorage.getItem('snag_lang') || 'en';
 function T(k){ return (I18N[lang]&&I18N[lang][k])||I18N.en[k]||k; }
@@ -615,7 +625,7 @@ function isSurvey(){ return curMode==='survey'; }
 function tradeList(){ return isSurvey()?SYSTEMS:TRADES; }
 function prioList(){ return isSurvey()?TIMEFRAMES:PRIORITIES; }
 // which whole sections appear in the PDF/Word report (per inspection)
-const REPORT_SECTIONS=['summary','plans','photos','history','logged','f_system','f_specref','f_close','f_source','f_cf','f_contractor'];
+const REPORT_SECTIONS=['summary','plans','photos','history','logged','f_system','f_specref','f_close','f_source','f_cf','f_signoff','f_contractor'];
 let curReportOpts={summary:true,plans:true,photos:true,history:true};
 function rptOn(k){ return curReportOpts[k]!==false; }
 
@@ -1693,9 +1703,24 @@ async function exportDOC(){
     if(rptOn('plans') && it.planRef){ const crop=await planCropImage(it);
       if(crop) b+=`<div style="margin-top:4px"><b>Plan: ${esc(planNameById(it.planRef.planId))}</b><br><img src="${crop}" style="width:48%;border:1px solid #ccc"></div>`; }
     if(rptOn('photos') && it.photos&&it.photos.length){ b+=`<div style="margin-top:6px">`; it.photos.forEach(p=>b+=`<img src="${p}" style="width:45%;margin:2px;border:1px solid #ccc">`); b+=`</div>`; }
+    // per-item completion checklist line — blank tick-box for the contractor to tick on the printout
+    if(!survey && rptOn('f_signoff')){
+      b+=`<div style="margin-top:6px;font-size:9.5pt"><span style="display:inline-block;width:11px;height:11px;border:1px solid #333;vertical-align:middle;margin-right:5px"></span><b>${esc(T('pdf_completed'))}</b>&nbsp;&nbsp;&nbsp;&nbsp;${esc(T('pdf_lbl_date'))}: <span style="display:inline-block;border-bottom:1px solid #999;width:110px">&nbsp;</span></div>`;
+    }
     if(rptOn('logged') && it.ts) b+=`<div style="margin-top:4px;font-size:8.5pt;color:#777">${esc(T('pdf_logged'))} ${esc(it.ts)}</div>`;
     b+=`</div>`;
    }
+  }
+  // contractor completion sign-off box (end of the list; hand-signed on the printout)
+  if(!survey && rptOn('f_signoff') && ordered.length){
+    const blank='<span style="display:inline-block;border-bottom:1px solid #999;min-width:190px">&nbsp;</span>';
+    b+=`<div style="margin-top:22px;border:1px solid #777;padding:12px;page-break-inside:avoid">`;
+    b+=`<div style="font-weight:bold;font-size:12pt;margin-bottom:8px">${esc(T('pdf_compl_h'))}</div>`;
+    b+=`<div style="font-size:10pt;margin-bottom:6px"><span style="display:inline-block;width:12px;height:12px;border:1px solid #333;vertical-align:middle;margin-right:6px"></span>${esc(T('pdf_compl_all'))}</div>`;
+    b+=`<div style="font-size:9pt;color:#555;margin-bottom:12px">${esc(T('pdf_compl_stmt'))}</div>`;
+    b+=`<table style="width:100%;font-size:10pt"><tr><td style="padding:8px 0"><b>${esc(T('pdf_lbl_name'))}:</b> ${blank}</td><td style="padding:8px 0"><b>${esc(T('pdf_lbl_company'))}:</b> ${blank}</td></tr>`;
+    b+=`<tr><td style="padding:8px 0"><b>${esc(T('pdf_lbl_sig'))}:</b> ${blank}</td><td style="padding:8px 0"><b>${esc(T('pdf_lbl_date'))}:</b> ${blank}</td></tr></table>`;
+    b+=`</div>`;
   }
   // plan pages (flattened image with all markup, matching the PDF)
   if(rptOn('plans')) for(const pl of plans){
@@ -1836,6 +1861,7 @@ async function exportPDF(){
     if(rptOn('history') && it.history&&it.history.length) est+=5+4*it.history.length;
     const kids=(!isSurvey()&&rptOn('f_cf')&&Array.isArray(it.children))?it.children:[];
     if(kids.length) est+=6+5*(kids.length+1);
+    if(!isSurvey()&&rptOn('f_signoff')) est+=7;   // per-item "Completed [ ]  Date ____" checklist line
     if(cells.length){ est+=4; for(let i=0;i<cells.length;i+=2) est+=Math.max(cells[i].h, cells[i+1]?cells[i+1].h:0)+5; }
     est+=10;
     if(y+est>H-20 && y>M+2){ doc.addPage(); y=M; }
@@ -1885,10 +1911,41 @@ async function exportPDF(){
       let col=0,rowH=0; for(const c of cells){ if(col===0) ck(c.h+6); const x=M+col*(PW+6); const dx=x+(PW-c.w)/2;
         try{ doc.addImage(c.src,'JPEG',dx,y,c.w,c.h); }catch(e){} doc.setDrawColor(c.plan?140:200); doc.setLineWidth(0.2); doc.rect(dx,y,c.w,c.h); rowH=Math.max(rowH,c.h); col++; if(col===2){ y+=rowH+5; col=0; rowH=0; } }
       if(col===1) y+=rowH+5; }
+    // per-item completion checklist line — a blank tick-box for the contractor to tick on the printout
+    if(!isSurvey() && rptOn('f_signoff')){
+      y+=2; ck(8); const bs=3.6;   // checkbox size (mm)
+      doc.setDrawColor(90); doc.setLineWidth(0.35); doc.rect(M,y-bs+0.5,bs,bs);
+      doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(40); doc.text(T('pdf_completed'),M+bs+2.5,y);
+      doc.setFont('helvetica','normal'); doc.setTextColor(110);
+      const dlbl=T('pdf_lbl_date')+':'; const dx=M+bs+2.5+doc.getTextWidth(T('pdf_completed'))+14;
+      doc.text(dlbl,dx,y); doc.setDrawColor(160); doc.setLineWidth(0.2); doc.line(dx+doc.getTextWidth(dlbl)+2,y,dx+doc.getTextWidth(dlbl)+40,y);
+      y+=4; doc.setTextColor(20);
+    }
     // logged time at the END of the snag (optional)
     if(rptOn('logged') && it.ts){ y+=1.5; doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(120); doc.text(T('pdf_logged')+' '+it.ts,M,y); y+=4; doc.setTextColor(20); }
     y+=2; line(y,true); y+=6;
    }
+  }
+
+  // ---- contractor completion sign-off box (end of the list; hand-signed on the printout) ----
+  if(!isSurvey() && rptOn('f_signoff') && ordered.length){
+    if(y+52>H-20){ doc.addPage(); y=M; } else { y+=2; }
+    doc.setDrawColor(120); doc.setLineWidth(0.4); doc.rect(M,y,W-2*M,44);
+    let by=y+7; const bx=M+5;
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(20); doc.text(T('pdf_compl_h'),bx,by); by+=7;
+    // "All snag items completed" tick-box
+    const cbs=4; doc.setDrawColor(90); doc.setLineWidth(0.35); doc.rect(bx,by-cbs+0.5,cbs,cbs);
+    doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(40); doc.text(T('pdf_compl_all'),bx+cbs+3,by); by+=6;
+    doc.setFontSize(8.5); doc.setTextColor(90);
+    doc.splitTextToSize(T('pdf_compl_stmt'),W-2*M-10).forEach(t=>{ doc.text(t,bx,by); by+=4.5; }); by+=3;
+    // two blank rows: Name / Company, then Signature / Date
+    doc.setFontSize(9.5); doc.setTextColor(40);
+    const colX=[bx, M+(W-2*M)/2+2]; const lineTo=x0=>x0+(W-2*M)/2-10;
+    const fieldRow=(pairs)=>{ pairs.forEach((p,i)=>{ const x0=colX[i]; doc.setFont('helvetica','bold'); doc.text(p+':',x0,by);
+        const lx=x0+doc.getTextWidth(p+':')+2; doc.setDrawColor(150); doc.setLineWidth(0.2); doc.line(lx,by,lineTo(x0),by); }); by+=9; };
+    fieldRow([T('pdf_lbl_name'),T('pdf_lbl_company')]);
+    fieldRow([T('pdf_lbl_sig'),T('pdf_lbl_date')]);
+    doc.setTextColor(20); y=y+44+6;
   }
 
   // ---- reference plan page(s) with pins ----
