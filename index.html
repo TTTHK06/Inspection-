@@ -86,6 +86,9 @@
   .item-head .loc{flex:1; font-size:13px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .del{background:transparent; border:1px solid var(--line); color:var(--bad); border-radius:6px; padding:6px 10px; font:inherit; font-size:12px; cursor:pointer;}
   .del:active{background:rgba(239,68,68,.12);}
+  .ord{background:var(--bg); border:1px solid var(--line); color:var(--muted); border-radius:6px; padding:6px 8px; font:inherit; font-size:12px; line-height:1; cursor:pointer;}
+  .ord:active{transform:translateY(1px); border-color:var(--accent); color:var(--ink);}
+  .ord:disabled{opacity:.25; cursor:default;}
   .item-body{padding:14px;}
   .collapsed .item-body{display:none;}
 
@@ -446,7 +449,7 @@ const I18N={
     cam_flip:'Flip',cam_shoot:'Capture',cam_close:'Close',
     word:'Word',phrases:'Phrases',phradd:'Add',phrclose:'Close',phrnew:'Add a phrase…',
     rpt_included:'In report — tap to exclude',rpt_excluded:'Excluded — tap to include',rpt_tag:'✕ not in report',
-    undo:'Undo',editno:'Tap to edit number',renum:'⇅ Renumber 1..N',clearhist:'Clear history',
+    undo:'Undo',editno:'Tap to edit number',renum:'⇅ Renumber 1..N',clearhist:'Clear history',moveup:'Move up',movedn:'Move down',
     rs_h:'Report sections',rs_hint:'Toggle which sections appear in the PDF / Word report.',
     rs_summary:'Summary',rs_plans:'Plan pages',rs_photos:'Photos',rs_history:'History',rs_logged:'Logged time',rs_group:'Group by room',rs_noroom:'No room',rs_rmrep:'report',rs_addrep:'report',
     rs_f_system:'System',rs_f_specref:'Spec ref',rs_f_close:'Target close',rs_f_source:'Carried-from ref',rs_f_cf:'Carried-forward items',rs_f_contractor:'Contractor sign-off',
@@ -491,7 +494,7 @@ const I18N={
     cam_flip:'Wissel',cam_shoot:'Neem',cam_close:'Sluit',
     word:'Word',phrases:'Frases',phradd:'Voeg by',phrclose:'Sluit',phrnew:'Voeg ’n frase by…',
     rpt_included:'In verslag — tik om uit te sluit',rpt_excluded:'Uitgesluit — tik om in te sluit',rpt_tag:'✕ nie in verslag',
-    undo:'Ontdoen',editno:'Tik om nommer te wysig',renum:'⇅ Hernommer 1..N',clearhist:'Wis geskiedenis',
+    undo:'Ontdoen',editno:'Tik om nommer te wysig',renum:'⇅ Hernommer 1..N',clearhist:'Wis geskiedenis',moveup:'Skuif op',movedn:'Skuif af',
     rs_h:'Verslag-afdelings',rs_hint:'Kies watter afdelings in die PDF / Word-verslag verskyn.',
     rs_summary:'Opsomming',rs_plans:'Planbladsye',rs_photos:'Foto’s',rs_history:'Geskiedenis',rs_logged:'Gelog-tyd',rs_group:'Groepeer per kamer',rs_noroom:'Geen kamer',rs_rmrep:'verslag',rs_addrep:'verslag',
     rs_f_system:'Stelsel',rs_f_specref:'Spes-verw',rs_f_close:'Teiken sluit',rs_f_source:'Oorgedra-verw',rs_f_cf:'Oorgedra items',rs_f_contractor:'Kontrakteur-ondertekening',
@@ -761,6 +764,15 @@ function editSnagNo(id){ const it=items.find(i=>i.id===id); if(!it) return;
   const n=parseInt(v,10); if(!isFinite(n)||n<1){ flash(lang==='af'?'Ongeldige nommer.':'Invalid number.'); return; }
   const prev=it.snag; pushUndo(lang==='af'?'nommer wysig':'edit number', ()=>{ it.snag=prev; });
   it.snag=n; if(n>seq) seq=n; touch(); render(); }
+function moveItem(id,dir){ // dir=-1 move earlier (up), +1 move later (down); numbers follow the new order
+  const sorted=[...items].sort((a,b)=>a.snag-b.snag);
+  const idx=sorted.findIndex(i=>i.id===id); if(idx<0) return;
+  const swap=idx+dir; if(swap<0||swap>=sorted.length) return;
+  const a=sorted[idx], b=sorted[swap]; const an=a.snag, bn=b.snag;
+  a.snag=bn; b.snag=an;
+  pushUndo(lang==='af'?'skuif item':'move item', ()=>{ const x=items.find(i=>i.id===a.id), y=items.find(i=>i.id===b.id); if(x&&y){ x.snag=an; y.snag=bn; } });
+  touch(); render();
+}
 function renumberItems(){ if(!items.length) return;
   const prev=items.map(i=>({id:i.id,snag:i.snag})), prevSeq=seq;
   pushUndo(lang==='af'?'hernommer':'renumber', ()=>{ prev.forEach(p=>{ const it=items.find(x=>x.id===p.id); if(it) it.snag=p.snag; }); seq=prevSeq; });
@@ -1457,9 +1469,12 @@ function itemCard(it){
          <textarea oninput="bind(${js(it.id)},'recommendation',this)" placeholder="...">${escHtml(it.recommendation||'')}</textarea></div>
        <div class="field"><label>${T('life')}</label><input value="${escAttr(it.life||'')}" oninput="bind(${js(it.id)},'life',this)" placeholder="e.g. ~2 yrs"></div>`
     : '';
+  const _nums=items.map(i=>i.snag); const _isFirst=it.snag===Math.min(..._nums); const _isLast=it.snag===Math.max(..._nums);
   div.innerHTML=`
     <div class="item-head">
       <span class="item-no" style="cursor:pointer" onclick="editSnagNo(${js(it.id)})" title="${T('editno')}">${T(isSurvey()?'item_no':'snag_no')} ${String(it.snag).padStart(3,'0')}</span>
+      <button class="ord" onclick="moveItem(${js(it.id)},-1)" title="${T('moveup')}" ${_isFirst?'disabled':''}>▲</button>
+      <button class="ord" onclick="moveItem(${js(it.id)},1)" title="${T('movedn')}" ${_isLast?'disabled':''}>▼</button>
       ${it.excluded?`<span class="excl-tag">${T('rpt_tag')}</span>`:''}
       <span class="loc" id="loclbl_${it.id}">${it.loc||'(no location set)'}</span>
       <button class="rpt${it.excluded?' off':''}" onclick="toggleExclude(${js(it.id)})" title="${it.excluded?T('rpt_excluded'):T('rpt_included')}">${it.excluded?'☐':'☑'}</button>
