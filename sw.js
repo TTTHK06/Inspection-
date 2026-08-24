@@ -2,7 +2,7 @@
    - Network-first for the app HTML so deploys show up immediately (falls back to cache offline).
    - Cache-first for everything else (jsPDF / PDF.js CDN libs) so the app runs with no signal.
    Bump CACHE when you want to force-evict old cached assets. */
-const CACHE = 'snag-v1';
+const CACHE = 'snag-v3';
 const SHELL = ['./', './index.html', './manifest.webmanifest'];
 
 self.addEventListener('install', e => {
