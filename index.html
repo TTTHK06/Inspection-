@@ -475,7 +475,7 @@ const I18N={
     pdf_summary_survey:'Condition Summary',pdf_detail_survey:'Condition Survey Detail',
     pdf_rec:'Recommendation:',pdf_cost:'Est. cost:',pdf_total:'Total estimated cost',pdf_cond:'Condition:',
     pdf_obs:'Observations:',pdf_asset:'Asset:',pdf_life:'Rem. life:',pdf_system:'System:',pdf_refplan:'Reference Plan',
-    rs_f_signoff:'Completion checklist',pdf_completed:'Completed',
+    rs_f_signoff:'Completion checklist',pdf_completed:'Completed',pdf_col_complete:'Complete',pdf_col_item:'Item',
     pdf_compl_h:'Contractor Completion Sign-off',
     pdf_compl_stmt:'I confirm that the snag items marked complete above have been carried out and completed.',
     pdf_compl_all:'All snag items completed',
@@ -520,7 +520,7 @@ const I18N={
     pdf_summary_survey:'Toestand Opsomming',pdf_detail_survey:'Toestandsopname Besonderhede',
     pdf_rec:'Aanbeveling:',pdf_cost:'Beraamde koste:',pdf_total:'Totale beraamde koste',pdf_cond:'Toestand:',
     pdf_obs:'Waarnemings:',pdf_asset:'Bate:',pdf_life:'Oorbl. lewe:',pdf_system:'Stelsel:',pdf_refplan:'Verwysingsplan',
-    rs_f_signoff:'Voltooiing-kontrolelys',pdf_completed:'Voltooi',
+    rs_f_signoff:'Voltooiing-kontrolelys',pdf_completed:'Voltooi',pdf_col_complete:'Voltooi',pdf_col_item:'Item',
     pdf_compl_h:'Kontrakteur Voltooiing-ondertekening',
     pdf_compl_stmt:'Ek bevestig dat die foutitems hierbo as voltooi gemerk, uitgevoer en voltooi is.',
     pdf_compl_all:'Alle foutitems voltooi',
@@ -1708,10 +1708,15 @@ async function exportDOC(){
     let notesHtml;
     if(!survey && rptOn('f_signoff')){
       const listRe=/^\s*(\d+[.)]|[••\-\*–])\s+/;
-      const box='<span style="display:inline-block;width:11px;height:11px;border:1px solid #333;vertical-align:middle;margin-right:5px"></span>';
-      notesHtml=(normText(it.notes)||'—').split('\n').map(line=> listRe.test(line)
-        ? `<div style="text-indent:-16px;padding-left:16px">${box}${esc(line)}</div>`
+      const nlines=(normText(it.notes)||'—').split('\n');
+      const hasList=nlines.some(l=>listRe.test(l));
+      const box='<span style="display:inline-block;width:11px;height:11px;border:1px solid #333;vertical-align:middle"></span>';
+      let inner='';
+      if(hasList) inner+=`<div style="font-size:8.5pt;font-weight:bold;color:#555;border-bottom:1px solid #999;padding-bottom:2px;margin-bottom:3px;padding-left:66px;text-indent:-66px"><span style="display:inline-block;width:66px">${esc(T('pdf_col_complete'))}</span>${esc(T('pdf_col_item'))}</div>`;
+      inner+=nlines.map(line=> listRe.test(line)
+        ? `<div style="padding-left:66px;text-indent:-66px"><span style="display:inline-block;width:66px">${box}</span>${esc(line)}</div>`
         : `<div>${esc(line)||'&nbsp;'}</div>`).join('');
+      notesHtml=inner||'—';
     } else { notesHtml=nl2br(normText(it.notes)||'—'); }
     b+=`<div style="margin-top:5px"><b>${esc(T(survey?'pdf_obs':'pdf_notes'))}</b><div style="font-size:11.5pt;margin-top:1px">${notesHtml}</div></div>`;
     if(survey){ b+=`<div style="margin-top:5px"><b>${esc(T('pdf_rec'))}</b><div style="font-size:11.5pt;margin-top:1px">${nl2br(normText(it.recommendation)||'—')}</div></div>`; }
@@ -1936,12 +1941,21 @@ async function exportPDF(){
     // per-line tick-boxes on numbered/bulleted list lines (snag mode, completion checklist on)
     const _boxNotes = !isSurvey() && rptOn('f_signoff');
     const _listRe = /^\s*(\d+[.)]|[••\-\*–])\s+/;
-    (normText(it.notes)||'—').split('\n').forEach(line=>{
+    const _lines = (normText(it.notes)||'—').split('\n');
+    const _hasList = _boxNotes && _lines.some(l=>_listRe.test(l));
+    const HCOL = 17;   // width of the "Complete" tick column (mm)
+    if(_hasList){      // column heading above the tick-box list
+      ck(7); doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(90);
+      doc.text(T('pdf_col_complete'), M, y); doc.text(T('pdf_col_item'), M+HCOL, y);
+      y+=1.6; doc.setDrawColor(180); doc.setLineWidth(0.2); doc.line(M,y,W-M,y); y+=3.6;
+      doc.setFont('helvetica','normal'); doc.setFontSize(10.5); doc.setTextColor(20);
+    }
+    _lines.forEach(line=>{
       const isList=_boxNotes && _listRe.test(line);
-      const ind=isList?5.2:0;
+      const ind=isList?HCOL:0;
       const wrapped=doc.splitTextToSize(line, W-2*M-ind);
       wrapped.forEach((wl,wi)=>{ ck(7);
-        if(isList && wi===0){ doc.setDrawColor(90); doc.setLineWidth(0.35); doc.rect(M, y-3, 3.2, 3.2); }
+        if(isList && wi===0){ doc.setDrawColor(90); doc.setLineWidth(0.35); doc.rect(M+5, y-3, 3.2, 3.2); }
         doc.text(wl, M+ind, y); y+=5.5; });
     });
     if(isSurvey()){
