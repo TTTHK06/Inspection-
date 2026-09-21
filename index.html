@@ -366,6 +366,7 @@
     <button class="btn btn-pdf" onclick="checkThenPDF()" id="t_pdf">PDF</button>
   </div>
   <div class="hint" id="hint">Auto-saving to this browser. Backup regularly.</div>
+  <div class="hint" style="margin-top:2px;font-size:9px;color:var(--na);letter-spacing:1px;opacity:.7;">by HKD</div>
 </div>
 
 <div class="modal" id="annot">
@@ -601,7 +602,7 @@ function planGrab(fx,fy){ const p=plans[curPlanPage]; if(!p) return null; let be
   (p.draws||[]).forEach(st=>{ (st.pts||[]).forEach(pt=>{ const d=(pt.fx-fx)**2+(pt.fy-fy)**2; if(d<bd){ bd=d; best={type:'stroke',obj:st}; } }); });
   return best; }
 
-const TRADES=['HVAC','Wet Services','Fire','General/Other'];
+const TRADES=['HVAC','Wet Services','Fire','Electrical','Electronics','General/Other'];
 const PRIORITIES=['Critical','Major','Minor'];   // severity (snag mode)
 // workflow / lifecycle status (snag mode) — a SEPARATE axis from severity.
 // open = outstanding, ongoing = in progress, carried = carried-forward to a re-inspection, closed = resolved
